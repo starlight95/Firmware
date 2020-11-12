@@ -56,7 +56,7 @@
 #include <parameters/param.h>
 #include <systemlib/mavlink_log.h>
 
-#include <uORB/PublicationQueued.hpp>
+#include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/camera_trigger.h>
 #include <uORB/topics/camera_capture.h>
@@ -179,7 +179,7 @@ private:
 
 	orb_advert_t		_trigger_pub;
 
-	uORB::PublicationQueued<vehicle_command_ack_s>	_cmd_ack_pub{ORB_ID(vehicle_command_ack)};
+	uORB::Publication<vehicle_command_ack_s>	_cmd_ack_pub{ORB_ID(vehicle_command_ack)};
 
 	param_t			_p_mode;
 	param_t			_p_activation_time;
@@ -504,7 +504,7 @@ CameraTrigger::test()
 	vcmd.param5 = 1.0;
 	vcmd.command = vehicle_command_s::VEHICLE_CMD_DO_DIGICAM_CONTROL;
 
-	uORB::PublicationQueued<vehicle_command_s> vcmd_pub{ORB_ID(vehicle_command)};
+	uORB::Publication<vehicle_command_s> vcmd_pub{ORB_ID(vehicle_command)};
 	vcmd_pub.publish(vcmd);
 }
 
@@ -512,7 +512,7 @@ void
 CameraTrigger::Run()
 {
 	// default loop polling interval
-	int poll_interval_usec = 5000;
+	int poll_interval_usec = 50000;
 
 	vehicle_command_s cmd{};
 	unsigned cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED;

@@ -37,10 +37,6 @@
 
 using namespace time_literals;
 
-#if defined(SPEKTRUM_POWER)
-static bool bind_spektrum(int arg);
-#endif /* SPEKTRUM_POWER */
-
 constexpr char const *RCInput::RC_SCAN_STRING[];
 
 RCInput::RCInput(const char *device) :
@@ -337,7 +333,7 @@ void RCInput::Run()
 		constexpr hrt_abstime rc_scan_max = 300_ms;
 
 		bool sbus_failsafe, sbus_frame_drop;
-		unsigned frame_drops;
+		unsigned frame_drops = 0;
 		bool dsm_11_bit;
 
 		if (_report_lock && _rc_scan_locked) {
@@ -606,7 +602,7 @@ void RCInput::Run()
 }
 
 #if defined(SPEKTRUM_POWER)
-bool bind_spektrum(int arg)
+bool RCInput::bind_spektrum(int arg) const
 {
 	int ret = PX4_ERROR;
 
@@ -652,7 +648,11 @@ int RCInput::custom_command(int argc, char *argv[])
 	const char *verb = argv[0];
 
 	if (!strcmp(verb, "bind")) {
-		bind_spektrum(DSMX8_BIND_PULSES);
+		uORB::Publication<vehicle_command_s> vehicle_command_pub{ORB_ID(vehicle_command)};
+		vehicle_command_s vcmd{};
+		vcmd.command = vehicle_command_s::VEHICLE_CMD_START_RX_PAIR;
+		vcmd.timestamp = hrt_absolute_time();
+		vehicle_command_pub.publish(vcmd);
 		return 0;
 	}
 

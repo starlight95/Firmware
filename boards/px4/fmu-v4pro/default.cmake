@@ -17,7 +17,8 @@ px4_add_board(
 		TEL3:/dev/ttyS0
 		TEL4:/dev/ttyS6
 	DRIVERS
-		adc
+		adc/board_adc
+		adc/ads1115
 		barometer # all available barometer drivers
 		batt_smbus
 		camera_capture
@@ -30,25 +31,23 @@ px4_add_board(
 		#imu # all available imu drivers
 		imu/invensense/icm20602
 		imu/invensense/icm20608g
-		#imu/invensense/mpu9250
-		#imu/mpu6000 # legacy icm20602/icm20608g driver
-		imu/mpu9250
+		imu/invensense/mpu9250
 		irlock
 		lights/blinkm
 		lights/rgbled
 		lights/rgbled_ncp5623c
-		#lights/rgbled_pwm
 		magnetometer # all available magnetometer drivers
 		mkblctrl
 		#optical_flow # all available optical flow drivers
 		optical_flow/px4flow
 		#osd
 		pca9685
+		pca9685_pwm_out
 		power_monitor/ina226
 		#protocol_splitter
 		pwm_input
 		pwm_out_sim
-		px4fmu
+		pwm_out
 		px4io
 		roboclaw
 		tap_esc
@@ -64,6 +63,7 @@ px4_add_board(
 		commander
 		dataman
 		ekf2
+		esc_battery
 		events
 		fw_att_control
 		fw_pos_control_l1
@@ -89,7 +89,6 @@ px4_add_board(
 		vtol_att_control
 	SYSTEMCMDS
 		bl_update
-		config
 		#dmesg
 		dumpfile
 		esc_calib
@@ -107,7 +106,7 @@ px4_add_board(
 		reboot
 		reflect
 		sd_bench
-		shutdown
+		system_time
 		tests # tests and test runner
 		top
 		topic_listener
@@ -124,4 +123,5 @@ px4_add_board(
 		px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
 		rover_steering_control # Rover example app
 		uuv_example_app
+		work_item
 	)

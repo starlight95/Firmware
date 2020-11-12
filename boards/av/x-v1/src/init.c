@@ -64,7 +64,7 @@
 #include <chip.h>
 #include <stm32_uart.h>
 #include <arch/board/board.h>
-#include "up_internal.h"
+#include "arm_internal.h"
 
 #include <px4_arch/io_timer.h>
 #include <drivers/drv_hrt.h>
@@ -206,8 +206,8 @@ static int configure_switch(void)
 {
 	int ret = PX4_ERROR;
 
-	// attach to the i2c bus
-	struct i2c_master_s *i2c = px4_i2cbus_initialize(PX4_I2C_BUS_ONBOARD);
+	// attach to the i2c bus (internal)
+	struct i2c_master_s *i2c = px4_i2cbus_initialize(3);
 
 	if (i2c == NULL) {
 		syslog(LOG_ERR, "[boot] I2C device not opened\n");

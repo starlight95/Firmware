@@ -38,7 +38,7 @@
 using namespace drv_pca9685_pwm;
 
 PCA9685::PCA9685(int bus, int addr):
-	I2C("PCA9685", PWM_OUTPUT0_DEVICE_PATH, bus, addr, 400000)
+	I2C(DRV_PWM_DEVTYPE_PCA9685, MODULE_NAME, bus, addr, 400000)
 {
 
 }
@@ -74,16 +74,16 @@ int PCA9685::updatePWM(const uint16_t *outputs, unsigned num_outputs)
 	return 0;
 }
 
-int PCA9685::setFreq(int freq)
+int PCA9685::setFreq(float freq)
 {
-	uint16_t realResolution = floorl((double)PCA9685_CLOCK_FREQ / freq);
+	uint16_t realResolution = floorl((float)PCA9685_CLOCK_FREQ / freq);
 
 	if (realResolution < PCA9685_PWM_RES) { // unable to provide enough resolution
 		PX4_DEBUG("frequency too high");
 		return -EINVAL;
 	}
 
-	uint16_t divider = (uint16_t)round((double)PCA9685_CLOCK_FREQ / freq / PCA9685_PWM_RES) - 1;
+	uint16_t divider = (uint16_t)round((float)PCA9685_CLOCK_FREQ / freq / PCA9685_PWM_RES) - 1;
 
 	if (divider > 0x00FF) { // out of divider
 		PX4_DEBUG("frequency too low");
