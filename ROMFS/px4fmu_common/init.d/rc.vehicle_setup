@@ -165,7 +165,23 @@ then
 
 fi
 
+#
+# uUV setup
+#
+if [ $VEHICLE_TYPE = uuv ]
+then
+	if [ $MIXER = none ]
+	then
+		echo "UUV mixer undefined"
+	fi
 
+	# Load mixer and configure outputs.
+	sh /etc/init.d/rc.interface
+
+	# Start standard uuv apps.
+	sh /etc/init.d/rc.uuv_apps
+
+fi
 
 #
 # Generic setup (autostart ID not found).

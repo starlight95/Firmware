@@ -99,8 +99,8 @@ px4_add_board(
 		i2cdetect
 		led_control
 		mixer
-		motor_ramp
-		motor_test
+		#motor_ramp
+		#motor_test
 		mtd
 		nshterm
 		param
@@ -110,7 +110,7 @@ px4_add_board(
 		reflect
 		sd_bench
 		shutdown
-		tests # tests and test runner
+		#tests # tests and test runner
 		top
 		topic_listener
 		tune_control
@@ -118,12 +118,12 @@ px4_add_board(
 		ver
 		work_queue
 	EXAMPLES
-		fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
-		hello
-		hwtest # Hardware test
+		#fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
+		#hello
+		#hwtest # Hardware test
 		#matlab_csv_serial
-		px4_mavlink_debug # Tutorial code from http://dev.px4.io/en/debug/debug_values.html
-		px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
-		rover_steering_control # Rover example app
-		uuv_example_app
+		#px4_mavlink_debug # Tutorial code from http://dev.px4.io/en/debug/debug_values.html
+		#px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
+		#rover_steering_control # Rover example app
+		#uuv_example_app
 	)

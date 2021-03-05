@@ -240,8 +240,8 @@ PX4FMU::init()
 	}
 
 	// XXX best would be to register / de-register the device depending on modes
-
-	/* try to claim the generic PWM output device node as well - it's OK if we fail at this */
+        // XXX最好是根据模式注册/注销设备
+	/* try to claim the generic PWM output device node as well - it's OK if we fail at this 也尝试声明通用的PWM输出设备节点-如果我们在这方面失败了就可以了*/
 	_class_instance = register_class_devname(PWM_OUTPUT_BASE_DEVICE_PATH);
 
 	if (_class_instance == CLASS_DEVICE_PRIMARY) {
@@ -463,7 +463,7 @@ PX4FMU::set_mode(Mode mode)
 	return OK;
 }
 
-/* When set_pwm_rate is called from either of the 2 IOCTLs:
+/* When set_pwm_rate is called from either of the 2 IOCTLs:主副两个io控制任意一个调用时
  *
  * PWM_SERVO_SET_UPDATE_RATE        - Sets the "alternate" channel's rate to the callers's rate specified
  *                                    and the non "alternate" channels to the _pwm_default_rate.
@@ -726,7 +726,7 @@ bool PX4FMU::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 	/* output to the servos */
 	if (_pwm_initialized) {
 		for (size_t i = 0; i < num_outputs; i++) {
-			up_pwm_servo_set(i, outputs[i]);
+			up_pwm_servo_set(i, outputs[i]);  //只能改fmu的六个通道。
 		}
 	}
 
@@ -753,7 +753,7 @@ PX4FMU::Run()
 
 	perf_begin(_cycle_perf);
 
-	_mixing_output.update();
+	_mixing_output.update();//fmu的直接混控调用输出
 
 	/* update PWM status if armed or if disarmed PWM values are set */
 	bool pwm_on = _mixing_output.armed().armed || (_num_disarmed_set > 0) || _mixing_output.armed().in_esc_calibration_mode;

@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 #include "mixer_module.hpp"
-
+#include "lib/matrix/matrix/math.hpp"
 #include <lib/mixer/MultirotorMixer/MultirotorMixer.hpp>
 
 #include <uORB/PublicationQueued.hpp>
@@ -46,7 +46,7 @@ MixingOutput::MixingOutput(uint8_t max_num_outputs, OutputModuleInterface &inter
 			   bool support_esc_calibration, bool ramp_up)
 	: ModuleParams(&interface),
 	  _control_subs{
-	{&interface, ORB_ID(actuator_controls_0)},
+	{&interface, ORB_ID(actuator_controls_0)},   // interface是指向某一个混控输入的接口，利用这个来区分后面要执行的updateOutputs函数是哪个。
 	{&interface, ORB_ID(actuator_controls_1)},
 	{&interface, ORB_ID(actuator_controls_2)},
 	{&interface, ORB_ID(actuator_controls_3)}
@@ -337,9 +337,11 @@ bool MixingOutput::update()
 		updateOutputSlewrate();
 	}
 
+	_vehicle_attitude_sub.update(&_v_att);
+
 	unsigned n_updates = 0;
 
-	/* get controls for required topics */
+	/* get controls for required topics 复制控制量*/
 	for (unsigned i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
 		if (_groups_subscribed & (1 << i)) {
 			if (_control_subs[i].copy(&_controls[i])) {
@@ -361,9 +363,15 @@ bool MixingOutput::update()
 		}
 	}
 
+	euler = matrix::Quatf(_v_att.q);
+	if(euler.theta()>0.25f)
+	{
+		enabled_to_add_back =true;
+	}
+	bool flag = false;
 	/* do mixing */
 	float outputs[MAX_ACTUATORS] {};
-	const unsigned mixed_num_outputs = _mixers->mix(outputs, _max_num_outputs);
+	const unsigned mixed_num_outputs = _mixers->mix(outputs, _max_num_outputs,flag);
 
 	/* the output limit call takes care of out of band errors, NaN and constrains */
 	output_limit_calc(_throttle_armed, armNoThrottle(), mixed_num_outputs, _reverse_output_mask,
@@ -378,7 +386,7 @@ bool MixingOutput::update()
 
 	bool stop_motors = mixed_num_outputs == 0 || !_throttle_armed;
 
-	/* overwrite outputs in case of lockdown or parachute triggering with disarmed values */
+	/* overwrite outputs in case of lockdown or parachute triggering with disarmed values 在锁定或降落伞触发时用锁定的值覆盖输出*/
 	if (_armed.lockdown || _armed.manual_lockdown) {
 		for (size_t i = 0; i < mixed_num_outputs; i++) {
 			_current_output_value[i] = _disarmed_value[i];
@@ -390,7 +398,7 @@ bool MixingOutput::update()
 	/* apply _param_mot_ordering */
 	reorderOutputs(_current_output_value);
 
-	/* now return the outputs to the driver */
+	/* now return the outputs to the driver 现在将输出返回给驱动程序*/
 	if (_interface.updateOutputs(stop_motors, _current_output_value, mixed_num_outputs, n_updates)) {
 		actuator_outputs_s actuator_outputs{};
 		setAndPublishActuatorOutputs(mixed_num_outputs, actuator_outputs);
@@ -410,7 +418,7 @@ MixingOutput::setAndPublishActuatorOutputs(unsigned num_outputs, actuator_output
 	actuator_outputs.noutputs = num_outputs;
 
 	for (size_t i = 0; i < num_outputs; ++i) {
-		actuator_outputs.output[i] = _current_output_value[i];
+		actuator_outputs.output[i] = _current_output_value[i];//_current_output_value：限幅后的输出值
 	}
 
 	actuator_outputs.timestamp = hrt_absolute_time();
@@ -491,7 +499,7 @@ int MixingOutput::reorderedMotorIndex(int index) const
 
 	return index;
 }
-
+//查看每个控制值的入口函数
 int MixingOutput::controlCallback(uintptr_t handle, uint8_t control_group, uint8_t control_index, float &input)
 {
 	const MixingOutput *output = (const MixingOutput *)handle;
@@ -506,7 +514,7 @@ int MixingOutput::controlCallback(uintptr_t handle, uint8_t control_group, uint8
 		input = -1.0f;
 	}
 
-	/* motor spinup phase - lock throttle to zero */
+	/* motor spinup phase - lock throttle to zero 电机加速阶段，将油门置零*/
 	if (output->_output_limit.state == OUTPUT_LIMIT_STATE_RAMP) {
 		if ((control_group == actuator_controls_s::GROUP_INDEX_ATTITUDE ||
 		     control_group == actuator_controls_s::GROUP_INDEX_ATTITUDE_ALTERNATE) &&
@@ -518,7 +526,7 @@ int MixingOutput::controlCallback(uintptr_t handle, uint8_t control_group, uint8
 		}
 	}
 
-	/* throttle not arming - mark throttle input as invalid */
+	/* throttle not arming - mark throttle input as invalid 油门未启用-将油门输入标记为无效*/
 	if (output->armNoThrottle() && !output->_armed.in_esc_calibration_mode) {
 		if ((control_group == actuator_controls_s::GROUP_INDEX_ATTITUDE ||
 		     control_group == actuator_controls_s::GROUP_INDEX_ATTITUDE_ALTERNATE) &&

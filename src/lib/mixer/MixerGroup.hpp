@@ -55,7 +55,7 @@ public:
 	MixerGroup(MixerGroup &&) = delete;
 	MixerGroup &operator=(MixerGroup &&) = delete;
 
-	unsigned			mix(float *outputs, unsigned space);
+	unsigned			mix(float *outputs, unsigned space, bool &flag);
 
 	uint16_t			get_saturation_status();
 
@@ -164,6 +164,7 @@ public:
 	void				set_airmode(Mixer::Airmode airmode);
 
 	unsigned			get_multirotor_count();
+	bool                            enabled;
 
 private:
 	List<Mixer *>			_mixers;	/**< linked list of mixers */

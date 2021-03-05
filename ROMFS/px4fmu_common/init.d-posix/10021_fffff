@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# @name fffff Quadrotor SITL
+#
+# @type Quadrotor Wide
+#
+# @maintainer Julian Oes <julian@oes.ch>
+#
+
+sh /etc/init.d/rc.mc_defaults
+
+        
+	param set MC_PITCHRATE_MAX 40
+	param set MC_ROLLRATE_MAX 40
+	param set MC_YAWRATE_MAX 30
+	
+
+        param set MC_ROLL_P 3.5
+	param set MC_ROLLRATE_P 0.145
+	param set MC_ROLLRATE_I 0.01
+	param set MC_ROLLRATE_D 0.0065
+	param set MC_PITCH_P 3.5
+	param set MC_PITCHRATE_P 0.5
+	param set MC_PITCHRATE_I 0.01
+	param set MC_PITCHRATE_D 0.005
+	param set MC_YAW_P 0.5
+	param set MC_YAWRATE_P 0.5
+	param set MC_YAWRATE_I 0.01
+	param set MC_YAWRATE_D 0
+
+        param set PWM_MIN 1140
+
+
+
+set MIXER quad_w
+

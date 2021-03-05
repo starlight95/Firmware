@@ -61,6 +61,7 @@ VtolType::VtolType(VtolAttitudeControl *att_controller) :
 	_vtol_vehicle_status = _attc->get_vtol_vehicle_status();
 	_actuators_out_0 = _attc->get_actuators_out0();
 	_actuators_out_1 = _attc->get_actuators_out1();
+	_actuators_out_2 = _attc->get_actuators_out2();
 	_actuators_mc_in = _attc->get_actuators_mc_in();
 	_actuators_fw_in = _attc->get_actuators_fw_in();
 	_local_pos = _attc->get_local_pos();
@@ -69,6 +70,9 @@ VtolType::VtolType(VtolAttitudeControl *att_controller) :
 	_tecs_status = _attc->get_tecs_status();
 	_land_detected = _attc->get_land_detected();
 	_params = _attc->get_params();
+	_manual_control_setpoint = _attc->get_manual_control_setpoint();
+	_w_takeoff = _attc->get_water_takeoff();
+	_tilt_ = _attc->get_tiltrotor();
 
 	for (auto &pwm_max : _max_mc_pwm_values.values) {
 		pwm_max = PWM_DEFAULT_MAX;
@@ -123,15 +127,85 @@ bool VtolType::init()
 void VtolType::update_mc_state()
 {
 	if (!flag_idle_mc) {
-		flag_idle_mc = set_idle_mc();
+		flag_idle_mc = set_idle_mc(); //从这里设定FW模式应该关闭的电机
 	}
 
 	if (_motor_state != motor_state::ENABLED) {
 		_motor_state = VtolType::set_motor_state(_motor_state, motor_state::ENABLED);
 	}
 
-	// copy virtual attitude setpoint to real attitude setpoint
-	memcpy(_v_att_sp, _mc_virtual_att_sp, sizeof(vehicle_attitude_setpoint_s));
+	if (_motor_state != motor_state::DISABLED) {
+		_motor_state = VtolType::set_motor_state(_motor_state, motor_state::DISABLED);
+	}
+	enable_to_water_tkoff = _params->tkof_on_water;
+
+	if (enable_to_water_tkoff)
+	{
+		// copy virtual attitude setpoint to real attitude setpoint
+		memcpy(_v_att_sp, _mc_virtual_att_sp, sizeof(vehicle_attitude_setpoint_s));
+		Eulerf euler1 = Quatf(_v_att->q);
+		float roll =euler1.phi();
+		float roll_sp = _v_att_sp->roll_body;
+		float pitch =euler1.theta();
+		float pitch_sp = _v_att_sp->pitch_body;
+		att_sp_tk = _w_takeoff->takeoff_att_sp;
+
+		float error_roll = roll_sp-roll;
+		float u_roll = 0.0f;
+		float error_pitch = pitch_sp-pitch;
+		float u_pitch = 0.0f;
+
+		if(euler1.theta()<att_sp_tk)
+		{
+			__tilt_control = euler1.theta() * 57.3f;
+			turn_front_45d_flag = false;
+		}else
+		{
+			__tilt_control = (euler1.theta()>0 ? euler1.theta():0)*57.3f;
+			turn_front_45d_flag = false;
+		}
+
+		control5 = _w_takeoff->sin_roll;
+		control6 = _w_takeoff->vehicle_is_openloop;
+		if(control6)
+		{
+			control4 = true;
+			pitch_servo_controller_on = true;
+		}
+
+		if(pitch_servo_controller_on)
+		{
+			float kp = 0.4f;
+			u_pitch = kp*error_pitch*57.3f;
+			__tilt_control_2 = __tilt_control-u_pitch;
+			__tilt_control_1 = __tilt_control-u_pitch;
+			__tilt_control_2 = math::constrain(__tilt_control_2,0.0f,95.0f);
+			__tilt_control_1 = math::constrain(__tilt_control_1,0.0f,95.0f);
+		}
+		else
+		{
+			__tilt_control_2 = __tilt_control;
+			__tilt_control_1 = __tilt_control;
+		}
+
+		if(control6)
+		{
+			float kp = 0.2f;
+			u_roll = kp*error_roll*57.3f;
+			__tilt_control_2 = __tilt_control_2-u_roll;
+			__tilt_control_1 = __tilt_control_1+u_roll;
+			__tilt_control_2 = math::constrain(__tilt_control_2,10.0f,110.0f);
+			__tilt_control_1 = math::constrain(__tilt_control_1,10.0f,110.0f);
+		}
+
+		_tilt_->u_roll = u_roll;
+		_tilt_->error_roll = error_roll;
+		_tilt_->u_pitch = u_pitch;
+		_tilt_->error_pitch = error_pitch;
+		_tilt_->tilt_1 = __tilt_control_1;
+		_tilt_->tilt_2 = __tilt_control_2;
+		_tilt_->timestamp = hrt_absolute_time();
+	}
 
 	_mc_roll_weight = 1.0f;
 	_mc_pitch_weight = 1.0f;
@@ -283,7 +357,8 @@ bool VtolType::set_idle_fw()
 
 bool VtolType::apply_pwm_limits(struct pwm_output_values &pwm_values, pwm_limit_type type)
 {
-	const char *dev = PWM_OUTPUT0_DEVICE_PATH;
+	const char *dev = _params->mc_on_fmu ? PWM_OUTPUT1_DEVICE_PATH : PWM_OUTPUT0_DEVICE_PATH;
+
 	int fd = px4_open(dev, 0);
 
 	if (fd < 0) {
@@ -316,6 +391,8 @@ motor_state VtolType::set_motor_state(const motor_state current_state, const mot
 	struct pwm_output_values pwm_values = {};
 	pwm_values.channel_count = num_outputs_max;
 
+	unsigned pwm_value = _params->idle_pwm_mc;  // 电机关闭时的pwm值。
+
 	// per default all motors are running
 	for (int i = 0; i < num_outputs_max; i++) {
 		pwm_values.values[i] = _max_mc_pwm_values.values[i];
@@ -327,8 +404,11 @@ motor_state VtolType::set_motor_state(const motor_state current_state, const mot
 
 	case motor_state::DISABLED:
 		for (int i = 0; i < num_outputs_max; i++) {
-			if (is_channel_set(i, _params->fw_motors_off)) {
+			if ((_vtol_mode == mode::FIXED_WING)&is_channel_set(i, _params->fw_motors_off)) {
 				pwm_values.values[i] = _disarmed_pwm_values.values[i];
+			}
+			if ((_vtol_mode != mode::FIXED_WING)&is_channel_set(i, _params->mc_motors_off)) {
+				pwm_values.values[i] = pwm_value;
 			}
 		}
 
@@ -346,7 +426,11 @@ motor_state VtolType::set_motor_state(const motor_state current_state, const mot
 
 	case motor_state::VALUE:
 		for (int i = 0; i < num_outputs_max; i++) {
-			if (is_channel_set(i, _params->fw_motors_off)) {
+			if ((_vtol_mode == mode::FIXED_WING)&is_channel_set(i, _params->fw_motors_off)) {
+				pwm_values.values[i] = value;
+			}
+
+			if ((_vtol_mode != mode::FIXED_WING)&is_channel_set(i, _params->mc_motors_off)) {
 				pwm_values.values[i] = value;
 			}
 		}

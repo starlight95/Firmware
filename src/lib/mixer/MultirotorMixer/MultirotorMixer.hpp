@@ -34,6 +34,9 @@
 #pragma once
 
 #include <mixer/Mixer/Mixer.hpp>
+#include <matrix/matrix/math.hpp>
+#include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionCallback.hpp>
 
 /**
  * Supported multirotor geometries.
@@ -118,7 +121,7 @@ public:
 	static MultirotorMixer *from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, const char *buf,
 					  unsigned &buflen);
 
-	unsigned		mix(float *outputs, unsigned space) override;
+	unsigned		mix(float *outputs, unsigned space,bool &flag) override;
 
 	uint16_t		get_saturation_status() override { return _saturation_status.value; }
 
@@ -225,7 +228,7 @@ private:
 	 * Thrust can be reduced to unsaturate the upper side.
 	 * @see mix_yaw() for the exact yaw behavior.
 	 */
-	inline void mix_airmode_disabled(float roll, float pitch, float yaw, float thrust, float *outputs);
+	inline void mix_airmode_disabled(float roll, float pitch, float yaw, float thrust, float *outputs,bool &flag);
 
 	/**
 	 * Mix yaw by updating an existing output vector (that already contains roll/pitch/thrust).

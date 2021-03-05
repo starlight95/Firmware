@@ -133,6 +133,7 @@ set(msg_files
 	test_motor.msg
 	timesync.msg
 	timesync_status.msg
+	tiltrotor.msg
 	trajectory_bezier.msg
 	trajectory_waypoint.msg
 	transponder_report.msg
@@ -168,6 +169,7 @@ set(msg_files
 	vtol_vehicle_status.msg
 	wheel_encoders.msg
 	wind_estimate.msg
+	water_takeoff.msg
 	yaw_estimator_status.msg
 )
 

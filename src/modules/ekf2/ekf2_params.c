@@ -73,7 +73,7 @@ PARAM_DEFINE_FLOAT(EKF2_MAG_DELAY, 0);
  * @reboot_required true
  * @decimal 1
  */
-PARAM_DEFINE_FLOAT(EKF2_BARO_DELAY, 0);
+PARAM_DEFINE_FLOAT(EKF2_BARO_DELAY, 10);
 
 /**
  * GPS measurement delay relative to IMU measurements

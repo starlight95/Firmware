@@ -1738,7 +1738,7 @@ void Ekf2::runPreFlightChecks(const float dt,
 	_preflt_checker.setUsingEvVelAiding(control_status.flags.ev_vel);
 
 	_preflt_checker.update(dt, innov);
-}
+} // 飞行检查部分
 
 void Ekf2::resetPreFlightChecks()
 {

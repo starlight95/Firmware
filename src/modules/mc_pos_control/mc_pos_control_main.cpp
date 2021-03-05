@@ -565,7 +565,7 @@ MulticopterPositionControl::Run()
 			_wv_controller->update(_wv_dcm_z_sp_prev, _states.yaw);
 		}
 
-		// an update is necessary here because otherwise the takeoff state doesn't get skiped with non-altitude-controlled modes
+		// an update is necessary here because otherwise the takeoff state doesn't get skiped with non-altitude-controlled modes 这里需要更新，否则起飞状态在非高度控制模式下不会被跳过
 		_takeoff.updateTakeoffState(_control_mode.flag_armed, _vehicle_land_detected.landed, false, 10.f,
 					    !_control_mode.flag_control_climb_rate_enabled, time_stamp_now);
 

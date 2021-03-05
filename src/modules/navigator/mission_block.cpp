@@ -33,7 +33,7 @@
 /**
  * @file mission_block.cpp
  *
- * Helper class to use mission items
+ * Helper class to use mission items 使用任务项的帮助类
  *
  * @author Julian Oes <julian@oes.ch>
  * @author Sander Smeets <sander@droneslab.com>

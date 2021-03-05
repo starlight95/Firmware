@@ -282,6 +282,189 @@ PARAM_DEFINE_FLOAT(MC_YAWRATE_FF, 0.0f);
 PARAM_DEFINE_FLOAT(MC_YAWRATE_K, 1.0f);
 
 /**
+ * Roll rate P gain
+ *
+ * Roll rate proportional gain, i.e. control output for angular speed error 1 rad/s.
+ *
+ * @min 0.01
+ * @max 0.5
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_X_P, 0.15f);
+
+/**
+ * Roll rate I gain
+ *
+ * Roll rate integral gain. Can be set to compensate static thrust difference or gravity center offset.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_X_I, 0.2f);
+
+/**
+ * Roll rate integrator limit
+ *
+ * Roll rate integrator limit. Can be set to increase the amount of integrator available to counteract disturbances or reduced to improve settling time after large roll moment trim changes.
+ *
+ * @min 0.0
+ * @decimal 2
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_X_INT_LIM, 0.30f);
+
+/**
+ * Roll rate D gain
+ *
+ * Roll rate differential gain. Small values help reduce fast oscillations. If value is too big oscillations will appear again.
+ *
+ * @min 0.0
+ * @max 0.01
+ * @decimal 4
+ * @increment 0.0005
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_X_D, 0.003f);
+
+/**
+ * Roll rate feedforward
+ *
+ * Improves tracking performance.
+ *
+ * @min 0.0
+ * @decimal 4
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_X_FF, 0.0f);
+
+/**
+ * Roll rate P gain
+ *
+ * Roll rate proportional gain, i.e. control output for angular speed error 1 rad/s.
+ *
+ * @min 0.01
+ * @max 0.5
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Y_P, 0.15f);
+
+/**
+ * Roll rate I gain
+ *
+ * Roll rate integral gain. Can be set to compensate static thrust difference or gravity center offset.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Y_I, 0.2f);
+
+/**
+ * Roll rate integrator limit
+ *
+ * Roll rate integrator limit. Can be set to increase the amount of integrator available to counteract disturbances or reduced to improve settling time after large roll moment trim changes.
+ *
+ * @min 0.0
+ * @decimal 2
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Y_INT_LIM, 0.30f);
+
+/**
+ * Roll rate D gain
+ *
+ * Roll rate differential gain. Small values help reduce fast oscillations. If value is too big oscillations will appear again.
+ *
+ * @min 0.0
+ * @max 0.01
+ * @decimal 4
+ * @increment 0.0005
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Y_D, 0.003f);
+
+/**
+ * Roll rate feedforward
+ *
+ * Improves tracking performance.
+ *
+ * @min 0.0
+ * @decimal 4
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Y_FF, 0.0f);
+
+/**
+ * Roll rate P gain
+ *
+ * Roll rate proportional gain, i.e. control output for angular speed error 1 rad/s.
+ *
+ * @min 0.01
+ * @max 0.5
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Z_P, 0.15f);
+
+/**
+ * Roll rate I gain
+ *
+ * Roll rate integral gain. Can be set to compensate static thrust difference or gravity center offset.
+ *
+ * @min 0.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Z_I, 0.2f);
+
+/**
+ * Roll rate integrator limit
+ *
+ * Roll rate integrator limit. Can be set to increase the amount of integrator available to counteract disturbances or reduced to improve settling time after large roll moment trim changes.
+ *
+ * @min 0.0
+ * @decimal 2
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Z_INT_LIM, 0.30f);
+
+/**
+ * Roll rate D gain
+ *
+ * Roll rate differential gain. Small values help reduce fast oscillations. If value is too big oscillations will appear again.
+ *
+ * @min 0.0
+ * @max 0.01
+ * @decimal 4
+ * @increment 0.0005
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Z_D, 0.003f);
+
+/**
+ * Roll rate feedforward
+ *
+ * Improves tracking performance.
+ *
+ * @min 0.0
+ * @decimal 4
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ACC_Z_FF, 0.0f);
+
+/**
  * Max acro roll rate
  * default: 2 turns per second
  *
@@ -395,3 +578,12 @@ PARAM_DEFINE_FLOAT(MC_ACRO_SUPEXPOY, 0.7f);
  * @group Multicopter Rate Control
  */
 PARAM_DEFINE_INT32(MC_BAT_SCALE_EN, 0);
+
+/**
+ * water takeoff attitude setpoint
+ *
+ * Roll rate proportional gain, i.e. control output for angular speed error 1 rad/s.
+
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ATT_SP_TKOF, 0.55f);

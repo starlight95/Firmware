@@ -48,6 +48,8 @@ set(geometry_files
 	quad_s250aq.toml
 	quad_vtail.toml
 	quad_wide.toml
+        quad_test.toml
+        quad_nopitch.toml
 	quad_x_cw.toml
 	quad_x.toml
 	quad_x_pusher.toml

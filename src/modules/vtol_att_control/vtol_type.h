@@ -46,6 +46,7 @@
 #include <lib/mathlib/mathlib.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_output.h>
+#include <matrix/Euler.hpp>
 
 struct Params {
 	int32_t idle_pwm_mc;			// pwm value for idle in mc mode
@@ -68,10 +69,13 @@ struct Params {
 	float front_trans_timeout;
 	float mpc_xy_cruise;
 	int32_t fw_motors_off;			/**< bitmask of all motors that should be off in fixed wing mode */
+	int32_t mc_motors_off;                  /**< bitmask of all motors that should be off in multi rotor mode */
 	int32_t diff_thrust;
 	float diff_thrust_scale;
 	float down_pitch_max;
 	float forward_thrust_scale;
+	bool  mc_on_fmu;
+	bool  tkof_on_water;
 };
 
 // Has to match 1:1 msg/vtol_vehicle_status.msg
@@ -170,6 +174,7 @@ public:
 	 */
 	float pusher_assist();
 
+	// void servo_controller(const float roll,const float roll_sp,float tilt_control,float tilt_control_1,float tilt_control_2);
 
 	mode get_mode() {return _vtol_mode;}
 
@@ -187,8 +192,10 @@ protected:
 	struct vehicle_attitude_setpoint_s *_fw_virtual_att_sp;	// virtual fw attitude setpoint
 	struct vehicle_control_mode_s		*_v_control_mode;	//vehicle control mode
 	struct vtol_vehicle_status_s 		*_vtol_vehicle_status;
+	struct manual_control_setpoint_s        *_manual_control_setpoint;
 	struct actuator_controls_s			*_actuators_out_0;			//actuator controls going to the mc mixer
 	struct actuator_controls_s			*_actuators_out_1;			//actuator controls going to the fw mixer (used for elevons)
+	struct actuator_controls_s			*_actuators_out_2;  // send messege
 	struct actuator_controls_s			*_actuators_mc_in;			//actuator controls from mc_rate_control
 	struct actuator_controls_s			*_actuators_fw_in;			//actuator controls from fw_att_control
 	struct vehicle_local_position_s			*_local_pos;
@@ -196,10 +203,24 @@ protected:
 	struct airspeed_validated_s 				*_airspeed_validated;					// airspeed
 	struct tecs_status_s				*_tecs_status;
 	struct vehicle_land_detected_s			*_land_detected;
+	struct water_takeoff_s                          *_w_takeoff;
+	struct tiltrotor_s				*_tilt_;
+
 
 	struct Params 					*_params;
 
 	bool flag_idle_mc = false;		//false = "idle is set for fixed wing mode"; true = "idle is set for multicopter mode"
+
+	bool turn_front_45d_flag = false;               //大仰角 (45度）：true -将前部舵机打到与机身平行。
+        bool get_15_deg = false;                        //达到位置标志位
+	bool get_45_deg = false;                        //达到位置标志位
+        bool control4 = false;                          //控制的四通道置位
+	float control5 = 0.0f;
+	bool control6 = false;
+	bool pitch_servo_controller_on = false;
+	float att_sp_tk = 0.0f;
+
+	bool enable_to_water_tkoff = false;
 
 	bool _pusher_active = false;
 	float _mc_roll_weight = 1.0f;	// weight for multicopter attitude controller roll output
@@ -222,6 +243,11 @@ protected:
 
 	motor_state _motor_state = motor_state::DISABLED;
 
+        float __tilt_control = 0.0f;
+	float __tilt_control_1 = 0.0f;
+	float __tilt_control_2 = 0.0f;
+
+	float tilt_int;
 
 
 	/**

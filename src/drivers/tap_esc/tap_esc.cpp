@@ -140,6 +140,7 @@ private:
 	uint32_t	_groups_subscribed = 0;
 	ESC_UART_BUF 	_uartbuf = {};
 	EscPacket 	_packet = {};
+	bool flag = false;
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::MC_AIRMODE>) _param_mc_airmode   ///< multicopter air-mode
@@ -451,7 +452,7 @@ void TAP_ESC::cycle()
 		if (_is_armed && _mixers != nullptr) {
 
 			/* do mixing */
-			num_outputs = _mixers->mix(&_outputs.output[0], num_outputs);
+			num_outputs = _mixers->mix(&_outputs.output[0], num_outputs,flag);
 			_outputs.noutputs = num_outputs;
 
 			/* publish mixer status */

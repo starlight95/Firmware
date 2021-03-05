@@ -269,7 +269,7 @@ PARAM_DEFINE_INT32(COM_RC_ARM_HYST, 1000);
  * @decimal 2
  */
 
-PARAM_DEFINE_FLOAT(COM_DISARM_LAND, 2.0f);
+PARAM_DEFINE_FLOAT(COM_DISARM_LAND, 0.0f);
 
 /**
  * Time-out for auto disarm if too slow to takeoff
@@ -283,7 +283,7 @@ PARAM_DEFINE_FLOAT(COM_DISARM_LAND, 2.0f);
  * @unit s
  * @decimal 2
  */
-PARAM_DEFINE_FLOAT(COM_DISARM_PRFLT,  10.0f);
+PARAM_DEFINE_FLOAT(COM_DISARM_PRFLT,  0.0f);
 
 
 /**

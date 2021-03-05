@@ -297,7 +297,7 @@ controls_tick()
 #if defined(PX4IO_PERF)
 	perf_begin(c_gather_ppm);
 #endif
-	bool ppm_updated = ppm_input(r_raw_rc_values, &r_raw_rc_count, &r_page_raw_rc_input[PX4IO_P_RAW_RC_DATA]);
+	bool ppm_updated = ppm_input(r_raw_rc_values, &r_raw_rc_count, &r_page_raw_rc_input[PX4IO_P_RAW_RC_DATA]); // can be set to true if we want use a virtual signal.
 
 	if (ppm_updated) {
 
@@ -427,7 +427,7 @@ controls_tick()
 
 				if (mapped < PX4IO_CONTROL_CHANNELS) {
 
-					/* invert channel if pitch - pulling the lever down means pitching up by convention */
+					/* invert channel if pitch - pulling the lever down means pitching up by convention 按惯例，把操纵杆拉下来就意味着向上俯仰*/
 					if (mapped == 1) {
 						/* roll, pitch, yaw, throttle, override is the standard order */
 						scaled = -scaled;

@@ -137,7 +137,7 @@ PARAM_DEFINE_INT32(SDLOG_MISSION, 0);
  * @reboot_required true
  * @group SD Logging
  */
-PARAM_DEFINE_INT32(SDLOG_PROFILE, 3);
+PARAM_DEFINE_INT32(SDLOG_PROFILE, 95);
 
 /**
  * Maximum number of log directories to keep

@@ -126,11 +126,11 @@ PARAM_DEFINE_FLOAT(UUV_DIRCT_PITCH, 0.0f);
  *
  * @group UUV Attitude Control
  */
-PARAM_DEFINE_FLOAT(UUV_DIRCT_YAW, 0.0f);
+PARAM_DEFINE_FLOAT(UUV_DIRCT_YAW, 0.1f);
 
 /**
  * Direct thrust input
  *
  * @group UUV Attitude Control
  */
-PARAM_DEFINE_FLOAT(UUV_DIRCT_THRUST, 0.0f);
+PARAM_DEFINE_FLOAT(UUV_DIRCT_THRUST, 0.3f);

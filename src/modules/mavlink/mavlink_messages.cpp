@@ -114,6 +114,7 @@
 #include <uORB/topics/vehicle_trajectory_waypoint.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/topics/wind_estimate.h>
+#include <uORB/topics/water_takeoff.h>
 
 using matrix::Vector3f;
 using matrix::wrap_2pi;
@@ -2168,6 +2169,72 @@ protected:
 		return sent;
 	}
 };
+
+// class MavlinkStreamwatertakeoff : public MavlinkStream
+// {
+// public:
+// 	const char *get_name() const override
+// 	{
+// 		return MavlinkStreamwatertakeoff::get_name_static();
+// 	}
+
+// 	static constexpr const char *get_name_static()
+// 	{
+// 		return "WATER TAKEOFF";
+// 	}
+
+// 	static constexpr uint16_t get_id_static()
+// 	{
+// 		return MAVLINK_MSG_ID_water_takeoff;
+// 	}
+
+// 	uint16_t get_id() override
+// 	{
+// 		return get_id_static();
+// 	}
+
+// 	static MavlinkStream *new_instance(Mavlink *mavlink)
+// 	{
+// 		return new MavlinkStreamwatertakeoff(mavlink);
+// 	}
+
+// 	bool const_rate() override
+// 	{
+// 		return true;
+// 	}
+
+// 	unsigned get_size() override
+// 	{
+// 		return _water_takeoff_sub.advertised() ? MAVLINK_MSG_ID_water_takeoff_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES : 0;
+// 	}
+
+// private:
+// 	uORB::Subscription _water_takeoff_sub{ORB_ID(water_takeoff)};
+
+// 	/* do not allow top copying this class */
+// 	MavlinkStreamwatertakeoff(MavlinkStreamwatertakeoff &) = delete;
+// 	MavlinkStreamwatertakeoff &operator = (const MavlinkStreamwatertakeoff &) = delete;
+
+// protected:
+// 	explicit MavlinkStreamwatertakeoff(Mavlink *mavlink) : MavlinkStream(mavlink)
+// 	{}
+
+// 	bool send(const hrt_abstime t) override
+// 	{
+// 		water_takeoff_s _w_takeoff;
+
+// 		if (_water_takeoff_sub.update(&_w_takeoff)) {
+// 			mavlink_water_takeoff_t msg{};
+
+// 			msg.sin_roll = _w_takeoff.sin_roll;
+// 			msg.vehicle_is_openlp = _w_takeoff.vehicle_is_openlooop;
+// 			mavlink_msg_water_takeoff_send_struct(_mavlink->get_channel(), &msg);
+// 			return true;
+// 		}
+
+// 		return false;
+// 	}
+// };
 
 class MavlinkStreamCameraTrigger : public MavlinkStream
 {
@@ -5204,6 +5271,7 @@ static const StreamListItem streams_list[] = {
 	create_stream_list_item<MavlinkStreamDebugFloatArray>(),
 	create_stream_list_item<MavlinkStreamNavControllerOutput>(),
 	create_stream_list_item<MavlinkStreamCameraCapture>(),
+	// create_stream_list_item<MavlinkStreamwatertakeoff>,
 	create_stream_list_item<MavlinkStreamCameraTrigger>(),
 	create_stream_list_item<MavlinkStreamCameraImageCaptured>(),
 	create_stream_list_item<MavlinkStreamDistanceSensor>(),

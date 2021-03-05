@@ -53,7 +53,7 @@ namespace cdev
 {
 
 /**
- * Abstract class for any character device
+ * Abstract class for any character device 任何字符设备的抽象类
  */
 class __EXPORT CDev
 {

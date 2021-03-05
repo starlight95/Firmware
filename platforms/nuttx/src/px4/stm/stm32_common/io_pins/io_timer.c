@@ -85,6 +85,12 @@ static int io_timer_handler7(int irq, void *context, void *arg);
  * For instance .clock_freq = 1000000 would set the prescaler to 1.
  * We also allow for overrides here but all timer register usage need to be
  * taken into account
+ * 如果作为时钟频率提供的计时器时钟源是STM32_APBx_TIMx_CLKIN
+*然后将计时器配置为在1MHz下自由运行。
+*否则，可以通过相应地调整时钟频率来获得其他频率。
+*例如，clock_freq=1000000会将预分频器设置为1。
+*我们也允许在这里重写，但所有计时器寄存器的使用都需要
+*考虑到
  */
 #if !defined(BOARD_PWM_FREQ)
 #define BOARD_PWM_FREQ 1000000

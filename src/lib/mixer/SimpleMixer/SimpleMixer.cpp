@@ -238,7 +238,7 @@ out:
 }
 
 unsigned
-SimpleMixer::mix(float *outputs, unsigned space)
+SimpleMixer::mix(float *outputs, unsigned space,bool &flag)
 {
 	float sum = 0.0f;
 
@@ -258,10 +258,10 @@ SimpleMixer::mix(float *outputs, unsigned space)
 			    _pinfo->controls[i].control_index,
 			    input);
 
-		sum += scale(_pinfo->controls[i].scaler, input);
+		sum += scale(_pinfo->controls[i].scaler, input);//s:的那一列。
 	}
 
-	*outputs = scale(_pinfo->output_scaler, sum);
+	*outputs = scale(_pinfo->output_scaler, sum);//O：的那一列。
 	return 1;
 }
 

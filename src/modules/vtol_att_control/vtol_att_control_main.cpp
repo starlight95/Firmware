@@ -88,6 +88,9 @@ VtolAttitudeControl::VtolAttitudeControl() :
 
 	_params_handles.down_pitch_max = param_find("VT_DWN_PITCH_MAX");
 	_params_handles.forward_thrust_scale = param_find("VT_FWD_THRUST_SC");
+	_params_handles.mc_on_fmu = param_find("VT_MC_ON_FMU");
+	_params_handles.mc_motors_off = param_find("VT_MC_MOT_OFFID");
+	_params_handles.tkoff_on_water = param_find("VT_TKOFF_ON_WT");
 
 	/* fetch initial parameter values */
 	parameters_update();
@@ -286,6 +289,13 @@ VtolAttitudeControl::parameters_update()
 	_params.airspeed_blend = math::min(_params.airspeed_blend, _params.transition_airspeed - 1.0f);
 
 	// update the parameters of the instances of base VtolType
+        param_get(_params_handles.mc_on_fmu, &l);
+	_params.mc_on_fmu = l;
+	param_get(_params_handles.mc_motors_off, &_params.mc_motors_off);
+	param_get(_params_handles.tkoff_on_water, &l);
+	_params.tkof_on_water = l;
+	param_get(_params_handles.att_sp_tk, &l);
+	_params.att_sp_tk = l;
 	if (_vtol_type != nullptr) {
 		_vtol_type->parameters_update();
 	}
@@ -358,6 +368,8 @@ VtolAttitudeControl::Run()
 		_airspeed_validated_sub.update(&_airspeed_validated);
 		_tecs_status_sub.update(&_tecs_status);
 		_land_detected_sub.update(&_land_detected);
+		_water_takeoff_sub.update(&_w_takeoff);
+		_tiltrotor_sub.update(&_tilt_);
 		vehicle_cmd_poll();
 
 		// check if mc and fw sp were updated
@@ -431,6 +443,9 @@ VtolAttitudeControl::Run()
 		_vtol_type->fill_actuator_outputs();
 		_actuators_0_pub.publish(_actuators_out_0);
 		_actuators_1_pub.publish(_actuators_out_1);
+		_actuators_2_pub.publish(_actuators_out_2);
+		_tiltrotor_pub.publish(_tilt_);
+		_water_takeoff_pub.publish(_w_takeoff);
 
 		// Advertise/Publish vtol vehicle status
 		_vtol_vehicle_status.timestamp = hrt_absolute_time();

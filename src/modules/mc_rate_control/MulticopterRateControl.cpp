@@ -94,6 +94,8 @@ MulticopterRateControl::parameters_updated()
 				  radians(_param_mc_acro_y_max.get()));
 
 	_actuators_0_circuit_breaker_enabled = circuit_breaker_enabled_by_val(_param_cbrk_rate_ctrl.get(), CBRK_RATE_CTRL_KEY);
+
+	att_sp_tkof = _param_mc_att_sp_tkof.get();
 }
 
 float
@@ -146,7 +148,7 @@ MulticopterRateControl::Run()
 
 	if (_vehicle_angular_velocity_sub.update(&angular_velocity)) {
 
-		// grab corresponding vehicle_angular_acceleration immediately after vehicle_angular_velocity copy
+		// grab corresponding vehicle_angular_acceleration immediately after vehicle_angular_velocity copy 在车辆角速度复制后立即获取相应的车辆角加速度
 		vehicle_angular_acceleration_s v_angular_acceleration{};
 		_vehicle_angular_acceleration_sub.copy(&v_angular_acceleration);
 
@@ -161,6 +163,8 @@ MulticopterRateControl::Run()
 
 		/* check for updates in other topics */
 		_v_control_mode_sub.update(&_v_control_mode);
+		_v_att_sub.update(&_v_att);
+		Eulerf att =Quatf(_v_att.q);
 
 		if (_vehicle_land_detected_sub.updated()) {
 			vehicle_land_detected_s vehicle_land_detected;
@@ -275,8 +279,39 @@ MulticopterRateControl::Run()
 
 			// publish actuator controls
 			actuator_controls_s actuators{};
-			actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.0f;
+
+
+			if(att.theta()>att_sp_tkof)
+			{
+
+			   if( (att.phi()<0.05f)&& (att.phi()>(-0.05f)) && !openloop_once)
+			   {
+				water_openloop = true;
+				water_takeoff_time = hrt_absolute_time();
+				openloop_once = true;
+			   }
+
+			}
+
+			if(water_openloop){
+				actuators.control[actuator_controls_s::INDEX_PITCH] = 0.0f;
+				actuators.control[actuator_controls_s::INDEX_ROLL] = 0.0f;
+				hrt_abstime time_1 = hrt_elapsed_time(&water_takeoff_time);
+				_w_takeoff.sin_roll = sin(att.phi());
+				// _w_takeoff.change_flags = 1;
+				if(time_1>2500_ms)
+				{
+					water_openloop = false;
+					_w_takeoff.change_att_sp = true;
+				}
+			}else
+			{
+				actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.0f;
+				_w_takeoff.sin_roll = sin(att.phi());
+			}
+			_w_takeoff.takeoff_att_sp = att_sp_tkof;
+			_w_takeoff.vehicle_is_openloop = water_openloop;
 			actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(att_control(2)) ? att_control(2) : 0.0f;
 			actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_thrust_sp) ? _thrust_sp : 0.0f;
 			actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = (float)_landing_gear.landing_gear;
@@ -298,6 +333,9 @@ MulticopterRateControl::Run()
 					}
 				}
 			}
+
+			_w_takeoff.timestamp = hrt_absolute_time();
+			_water_takeoff_pub.publish(_w_takeoff);
 
 			actuators.timestamp = hrt_absolute_time();
 			_actuators_0_pub.publish(actuators);

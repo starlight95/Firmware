@@ -304,8 +304,8 @@ void PWMDriverWrapper::updatePWMParams()
 
 		if (param_h != PARAM_INVALID) {
 			int32_t pval = 0;
-			param_get(param_h, &pval);
-
+			// param_get(param_h, &pval);
+                        pval = 1600;
 			if (pval != -1) {
 				_mixing_output.minValue(i + 8) = pval;
 			}

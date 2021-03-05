@@ -1,0 +1,28 @@
+Mixer for quad tiltrotor (w motor configuration)
+================================================
+
+This file defines a single mixer for a tiltrotor (SITL gazebo) with motors in w configuration.
+
+R: 4w 10000 10000 10000 0
+
+# tilt servo motor 1
+M: 1
+O:      10000  10000      0 -10000  10000
+S: 1 4      0  20000 -10000 -10000  10000
+
+# tilt servo motor 2
+M: 1
+O:      10000  10000      0 -10000  10000
+S: 1 4      0  20000 -10000 -10000  10000
+
+# tilt servo motor 3
+M: 1
+O:      10000  10000      0 -10000  10000
+S: 1 4      0  20000 -10000 -10000  10000
+
+# tilt servo motor 4
+M: 1
+O:      10000  10000      0 -10000  10000
+S: 1 4      0  20000 -10000 -10000  10000
+
+

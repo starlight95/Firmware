@@ -54,6 +54,7 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <vtol_att_control/vtol_type.h>
+#include <uORB/topics/water_takeoff.h>
 
 #include <AttitudeControl.hpp>
 
@@ -102,7 +103,7 @@ private:
 	 */
 	void		control_attitude();
 
-	AttitudeControl _attitude_control; ///< class for attitude control calculations
+	AttitudeControl _attitude_control; //< class for attitude control calculations
 
 	uORB::Subscription _v_att_sp_sub{ORB_ID(vehicle_attitude_setpoint)};		/**< vehicle attitude setpoint subscription */
 	uORB::Subscription _v_rates_sp_sub{ORB_ID(vehicle_rates_setpoint)};		/**< vehicle rates setpoint subscription */
@@ -111,6 +112,7 @@ private:
 	uORB::Subscription _manual_control_sp_sub{ORB_ID(manual_control_setpoint)};	/**< manual control setpoint subscription */
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};			/**< vehicle status subscription */
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};	/**< vehicle land detected subscription */
+	uORB::Subscription _water_takeoff_sub{ORB_ID(water_takeoff)};
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_attitude_sub{this, ORB_ID(vehicle_attitude)};
 
@@ -124,6 +126,7 @@ private:
 	struct vehicle_control_mode_s		_v_control_mode {};	/**< vehicle control mode */
 	struct vehicle_status_s			_vehicle_status {};	/**< vehicle status */
 	struct vehicle_land_detected_s		_vehicle_land_detected {};
+	struct water_takeoff_s			_w_takeoff{};
 
 	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
 
@@ -132,6 +135,9 @@ private:
 	float _man_yaw_sp{0.f};				/**< current yaw setpoint in manual mode */
 
 	hrt_abstime _last_run{0};
+	bool change_att_sp = false;
+	bool change_once = false;
+	float att_sp_tk= 0.0f;
 
 	bool _reset_yaw_sp{true};
 

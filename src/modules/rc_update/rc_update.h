@@ -85,9 +85,11 @@ public:
 
 	bool init();
 
+
 private:
 
 	void Run() override;
+	void gen_virtual_rc(manual_control_setpoint_s &manual);
 
 	/**
 	 * Check for changes in rc_parameter_map
@@ -165,6 +167,14 @@ private:
 	float _param_rc_values[rc_parameter_map_s::RC_PARAM_MAP_NCHAN] {};	/**< parameter values for RC control */
 
 	hrt_abstime _last_rc_to_param_map_time = 0;
+	hrt_abstime start_time= 0;
+	hrt_abstime last_time = 0;
+	hrt_abstime takeoff_time= 0;
+	hrt_abstime fly_time= 0;
+	hrt_abstime fly_end_time= 0;
+	hrt_abstime land_time= 0;
+	bool start_flag = 1;
+	bool takeoff_flag = 0;
 
 	math::LowPassFilter2p _filter_roll{50.0f, 10.f}; /**< filters for the main 4 stick inputs */
 	math::LowPassFilter2p _filter_pitch{50.0f, 10.f}; /** we want smooth setpoints as inputs to the controllers */

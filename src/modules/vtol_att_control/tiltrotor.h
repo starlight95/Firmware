@@ -43,6 +43,9 @@
 #include "vtol_type.h"
 #include <parameters/param.h>
 #include <drivers/drv_hrt.h>
+#include <matrix/Euler.hpp>
+#include <matrix/Dcm.hpp>
+#include <matrix/Quaternion.hpp>
 
 class Tiltrotor : public VtolType
 {
@@ -67,6 +70,11 @@ private:
 		float tilt_transition;			/**< actuator value corresponding to transition tilt (e.g 45 degrees) */
 		float tilt_fw;					/**< actuator value corresponding to fw tilt */
 		float front_trans_dur_p2;
+		float tilt_err_1;                      /*front right servo position compensation*/
+		float tilt_err_2;                      /*front left servo position compensation*/
+		float tilt_err_3;                      /*back right servo position compensation*/
+		float tilt_err_4;                      /*back left servo position compensation*/
+                int auto_outputs;
 	} _params_tiltrotor;
 
 	struct {
@@ -74,6 +82,11 @@ private:
 		param_t tilt_transition;
 		param_t tilt_fw;
 		param_t front_trans_dur_p2;
+		param_t tilt_err_1;
+		param_t tilt_err_2;
+		param_t tilt_err_3;
+		param_t tilt_err_4;
+		param_t auto_outputs;
 	} _params_handles_tiltrotor;
 
 	enum class vtol_mode {
@@ -96,9 +109,26 @@ private:
 		hrt_abstime transition_start;	/**< absoulte time at which front transition started */
 	} _vtol_schedule;
 
-	float _tilt_control{0.0f};		/**< actuator value for the tilt servo */
+        float _tilt_control{0.0f};
+	float _tilt_control1{0.0f};
+        float _tilt_control2{0.0f};
+	float _tilt_control3{0.0f};
+	float _tilt_control4{0.0f};
+
+
+	hrt_abstime start_time= 0;
+	hrt_abstime last_time = 0;
+	hrt_abstime takeoff_time= 0;
+	hrt_abstime fly_time= 0;
+	hrt_abstime fly_end_time= 0;
+	hrt_abstime land_time= 0;
+	bool start_flag = 1;
+	bool takeoff_flag = 0;
+	bool water_takeoff = true;
+	bool can_not_trun_front_more = false;
 
 	void parameters_update() override;
+	void gen_virutal_mc_controls();
 
 };
 #endif

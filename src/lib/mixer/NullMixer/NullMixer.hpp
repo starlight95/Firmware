@@ -67,7 +67,7 @@ public:
 	 */
 	static NullMixer		*from_text(const char *buf, unsigned &buflen);
 
-	unsigned			mix(float *outputs, unsigned space) override;
+	unsigned			mix(float *outputs, unsigned space,bool &flag) override;
 
 	unsigned			set_trim(float trim) override { return 1; }
 	unsigned			get_trim(float *trim) override { return 1; }

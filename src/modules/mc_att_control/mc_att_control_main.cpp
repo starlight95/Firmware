@@ -131,6 +131,7 @@ MulticopterAttitudeControl::generate_attitude_setpoint(float dt, bool reset_yaw_
 {
 	vehicle_attitude_setpoint_s attitude_setpoint{};
 	const float yaw = Eulerf(Quatf(_v_att.q)).psi();
+	Eulerf euler11 = Eulerf(Quatf(_v_att.q));
 
 	/* reset yaw setpoint to current position if needed */
 	if (reset_yaw_sp) {
@@ -166,13 +167,42 @@ MulticopterAttitudeControl::generate_attitude_setpoint(float dt, bool reset_yaw_
 
 	Quatf q_sp_rpy = AxisAnglef(v(0), v(1), 0.f);
 	Eulerf euler_sp = q_sp_rpy;
-	attitude_setpoint.roll_body = euler_sp(0);
-	attitude_setpoint.pitch_body = euler_sp(1);
+	attitude_setpoint.roll_body =  euler_sp(0);
+
+	change_att_sp = _w_takeoff.change_att_sp;
+	att_sp_tk = _w_takeoff.takeoff_att_sp;
+	float pitchsp = _v_att_sp.pitch_body;
+	float pitch = euler11.theta();
+	float error = pitch-pitchsp;
+
+	if(change_att_sp)
+	{
+		if(change_once)
+		{
+			attitude_setpoint.pitch_body = euler_sp(1);
+		}else
+		{
+			if(error<0.05f)
+			{
+				attitude_setpoint.pitch_body = euler_sp(1);
+				change_once = true;
+			}
+			else
+			{
+				attitude_setpoint.pitch_body = att_sp_tk + euler_sp(1);
+			}
+		}
+
+	}else
+	{
+		attitude_setpoint.pitch_body = att_sp_tk + euler_sp(1);
+	}
+
 	// The axis angle can change the yaw as well (noticeable at higher tilt angles).
 	// This is the formula by how much the yaw changes:
 	//   let a := tilt angle, b := atan(y/x) (direction of maximum tilt)
 	//   yaw = atan(-2 * sin(b) * cos(b) * sin^2(a/2) / (1 - 2 * cos^2(b) * sin^2(a/2))).
-	attitude_setpoint.yaw_body = _man_yaw_sp + euler_sp(2);
+	attitude_setpoint.yaw_body = _man_yaw_sp + yaw;
 
 	/* modify roll/pitch only if we're a VTOL */
 	if (_vehicle_status.is_vtol) {
@@ -292,6 +322,7 @@ MulticopterAttitudeControl::Run()
 		_v_control_mode_sub.update(&_v_control_mode);
 		_vehicle_land_detected_sub.update(&_vehicle_land_detected);
 		_vehicle_status_sub.update(&_vehicle_status);
+		_water_takeoff_sub.update(&_w_takeoff);
 
 		/* Check if we are in rattitude mode and the pilot is above the threshold on pitch
 		* or roll (yaw can rotate 360 in normal att control). If both are true don't

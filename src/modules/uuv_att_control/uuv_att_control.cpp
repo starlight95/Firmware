@@ -112,6 +112,16 @@ void UUVAttitudeControl::vehicle_attitude_setpoint_poll()
 	}
 }
 
+void UUVAttitudeControl::vehicle_global_position_poll()
+{
+	bool updated = false;
+	orb_check(_vehicle_global_position_sub, &updated);
+
+	if(updated)
+	{
+		orb_copy(ORB_ID(vehicle_global_position), _vehicle_global_position_sub, &_vehicle_global_position);
+	}
+}
 
 void UUVAttitudeControl::constrain_actuator_commands(float roll_u, float pitch_u, float yaw_u, float thrust_u)
 {
@@ -253,6 +263,13 @@ void UUVAttitudeControl::run()
 	_manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
 
 	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
+	// 新增订阅位置值（高度值）
+	_vehicle_global_position_sub = orb_subscribe(ORB_ID(vehicle_global_position));
+
+    /* 发布期望姿态值 */
+	memset(&_vehicle_attitude_sp, 0, sizeof(_vehicle_attitude_sp));
+	orb_advert_t _vehicle_attitude_sp_pub = orb_advertise(ORB_ID(vehicle_attitude_setpoint), &_vehicle_attitude_sp);
+
 
 
 	/* rate limit control mode updates to 5Hz */
@@ -285,6 +302,7 @@ void UUVAttitudeControl::run()
 		/* check vehicle control mode for changes to publication state */
 		vehicle_control_mode_poll();
 		vehicle_attitude_setpoint_poll();
+		vehicle_global_position_poll();
 
 		/* update parameters from storage */
 		parameters_update();
@@ -309,25 +327,75 @@ void UUVAttitudeControl::run()
 			vehicle_control_mode_poll();
 			manual_control_setpoint_poll();
 
-
-			/* Run geometric attitude controllers if NOT manual mode*/
-			if (!_vcontrol_mode.flag_control_manual_enabled
-			    && _vcontrol_mode.flag_control_attitude_enabled
-			    && _vcontrol_mode.flag_control_rates_enabled) {
+			// run the controller
+                        if(_local_pos.z < 3.0f)
+			{
+				/* Run geometric attitude controllers if NOT manual mode*/
+				if (_vcontrol_mode.flag_control_manual_enabled
+			    || _vcontrol_mode.flag_control_attitude_enabled
+			    || _vcontrol_mode.flag_control_rates_enabled) {
 
 				int input_mode = _param_input_mode.get();
 
 				// if (input_mode == 0) // process incoming vehicles setpoint data --> nothing to do
-				if (input_mode == 1) { // process manual data
+				   if (input_mode == 1)
+				   { // process manual data
 					_vehicle_attitude_sp.roll_body = _param_direct_roll.get();
 					_vehicle_attitude_sp.pitch_body = _param_direct_pitch.get();
 					_vehicle_attitude_sp.yaw_body = _param_direct_yaw.get();
 					_vehicle_attitude_sp.thrust_body[0] = _param_direct_thrust.get();
-				}
+				   }
+
 
 				/* Geometric Control*/
 				control_attitude_geo(_vehicle_attitude, _vehicle_attitude_sp);
+
+				orb_publish(ORB_ID(vehicle_attitude_setpoint), _vehicle_attitude_sp_pub, &_vehicle_attitude_sp);
+			    }
+
+			}else
+			{
+				/* not in manual mode */
+                        //     if (!_vcontrol_mode.flag_control_manual_enabled
+			//     && _vcontrol_mode.flag_control_attitude_enabled
+			//     && _vcontrol_mode.flag_control_rates_enabled) {
+
+			// 	int input_mode = _param_input_mode.get();
+
+			// 	// if (input_mode == 0) // process incoming vehicles setpoint data --> nothing to do
+			// 	   if (input_mode == 1)
+			// 	   { // process manual data
+			// 		//_vehicle_attitude_sp.roll_body = _param_direct_roll.get();
+			// 		_vehicle_attitude_sp.pitch_body = 0.0;
+			// 		//_vehicle_attitude_sp.yaw_body = _param_direct_yaw.get();
+			// 		//_vehicle_attitude_sp.thrust_body[0] = _param_direct_thrust.get();
+			// 	   }
+
+
+			// 	/* Geometric Control*/
+			// 	control_attitude_geo(_vehicle_attitude, _vehicle_attitude_sp);
+
+			// 	orb_publish(ORB_ID(vehicle_attitude_setpoint), _vehicle_attitude_sp_pub, &_vehicle_attitude_sp);
+			//     }
+			     int input_mode = _param_input_mode.get();
+
+				// if (input_mode == 0) // process incoming vehicles setpoint data --> nothing to do
+				   if (input_mode == 1)
+				   { // process manual data
+					//_vehicle_attitude_sp.roll_body = _param_direct_roll.get();
+					_vehicle_attitude_sp.pitch_body = 0.0;
+					//_vehicle_attitude_sp.yaw_body = _param_direct_yaw.get();
+					//_vehicle_attitude_sp.thrust_body[0] = _param_direct_thrust.get();
+				   }
+
+
+				/* Geometric Control*/
+				control_attitude_geo(_vehicle_attitude, _vehicle_attitude_sp);
+
+				orb_publish(ORB_ID(vehicle_attitude_setpoint), _vehicle_attitude_sp_pub, &_vehicle_attitude_sp);
 			}
+
+
 		}
 
 		loop_counter++;
@@ -346,20 +414,26 @@ void UUVAttitudeControl::run()
 
 		}
 
-		if (fds[2].revents & POLLIN) {
 
-			orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
 
-			_actuators.timestamp = hrt_absolute_time();
+		_actuator_controls_pub.publish(_actuators);
 
-			/* Only publish if any of the proper modes are enabled */
-			if (_vcontrol_mode.flag_control_manual_enabled ||
-			    _vcontrol_mode.flag_control_attitude_enabled) {
-				/* publish the actuator controls */
-				_actuator_controls_pub.publish(_actuators);
 
-			}
-		}
+
+		// if (fds[2].revents & POLLIN) {
+
+		// 	orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
+
+		// 	_actuators.timestamp = hrt_absolute_time();
+
+		// 	/* Only publish if any of the proper modes are enabled */
+		// 	if (_vcontrol_mode.flag_control_manual_enabled ||
+		// 	    _vcontrol_mode.flag_control_attitude_enabled) {
+		// 		/* publish the actuator controls */
+		// 		_actuator_controls_pub.publish(_actuators);
+
+		// 	}
+		// }
 	}
 
 	orb_unsubscribe(_vcontrol_mode_sub);

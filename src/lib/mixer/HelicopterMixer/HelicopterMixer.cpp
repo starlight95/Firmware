@@ -193,7 +193,7 @@ HelicopterMixer::from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handl
 }
 
 unsigned
-HelicopterMixer::mix(float *outputs, unsigned space)
+HelicopterMixer::mix(float *outputs, unsigned space,bool &flag)
 {
 	if (space < _mixer_info.control_count + 1u) {
 		return 0;

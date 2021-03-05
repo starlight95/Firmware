@@ -143,7 +143,7 @@ bool PreFlightCheck::ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 
 		success = false;
 		goto out;
-	}
+	} // 检查偏航的报错指令段。
 
 	// check accelerometer delta velocity bias estimates
 	param_get(param_find("COM_ARM_EKF_AB"), &test_limit);

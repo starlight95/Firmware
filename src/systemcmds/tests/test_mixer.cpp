@@ -378,7 +378,8 @@ bool MixerTest::mixerTest()
 
 	/* mix */
 	should_prearm = true;
-	mixed = mixer_group.mix(&outputs[0], output_max);
+	bool flag = true;
+	mixed = mixer_group.mix(&outputs[0], output_max,flag);
 
 	output_limit_calc(should_arm, should_prearm, mixed, reverse_pwm_mask, r_page_servo_disarmed, r_page_servo_control_min,
 			  r_page_servo_control_max, outputs, r_page_servos, &output_limit);

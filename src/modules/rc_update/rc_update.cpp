@@ -39,7 +39,7 @@
 
 #include "rc_update.h"
 
-using namespace time_literals;
+using namespace time_literals; // 时间单位转换的命名空间。
 
 namespace RCUpdate
 {
@@ -315,6 +315,59 @@ RCUpdate::set_params_from_rc()
 }
 
 void
+RCUpdate::gen_virtual_rc(manual_control_setpoint_s &manual)
+{
+
+        if(manual.arm_switch == manual_control_setpoint_s::SWITCH_POS_ON)
+	{
+	   if(start_flag == 1)
+	   {
+		start_time= hrt_absolute_time();
+		start_flag = 0;
+		takeoff_flag = 1;
+
+	   }
+
+	   if(hrt_elapsed_time(&start_time)>5_s)
+	   {
+		if(takeoff_flag == 1)
+		{
+			takeoff_time= hrt_absolute_time();
+			takeoff_flag = 0;
+
+		}
+
+		if(hrt_elapsed_time(&takeoff_time)<=3_s)
+		{
+		      manual.y = 0;
+		      manual.x = 0;
+		      manual.r = 0;
+		      manual.z = 0.2*hrt_elapsed_time(&takeoff_time)/3_s;
+		}
+		// else if ((hrt_elapsed_time(&takeoff_time)>=3_s) && hrt_elapsed_time(&takeoff_time)<=10_s)
+		// {
+		//       manual.y = 0;
+		//       manual.x = 0;
+		//       manual.r = 0;
+		//       manual.z = 0.2;
+		// }
+		else
+		{
+		      manual.y = 0;
+		      manual.x = 0;
+		      manual.r = 0;
+		      manual.z = 0.2;
+		}
+
+
+
+	   }
+
+	}
+}
+
+
+void
 RCUpdate::Run()
 {
 	if (should_exit()) {
@@ -542,6 +595,9 @@ RCUpdate::Run()
 					     _param_rc_stab_th.get(), _param_rc_stab_th.get() < 0.f);
 			manual.man_switch = get_rc_sw2pos_position(rc_channels_s::RC_CHANNELS_FUNCTION_MAN,
 					    _param_rc_man_th.get(), _param_rc_man_th.get() < 0.f);
+
+
+                        // gen_virtual_rc(manual);
 
 			/* publish manual_control_setpoint topic */
 			_manual_control_pub.publish(manual);

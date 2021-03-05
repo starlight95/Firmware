@@ -34,7 +34,7 @@
 /**
  * @file mixer.cpp
  *
- * Control channel input/output mixer and failsafe.
+ * Control channel input/output mixer and failsafe.控制通道输入输出混控器和故障保护
  *
  * @author Lorenz Meier <lorenz@px4.io>
  */
@@ -78,6 +78,15 @@ static volatile bool in_mixer = false;
 
 static bool new_fmu_data = false;
 static uint64_t last_fmu_update = 0;
+bool flag = false;
+bool flag_change = false;
+bool flag_add = false;
+int c4 = 0;
+int c6 = 0;
+int c21 = 0;
+bool enable_to_water_tkof;
+float sin_roll = 0.0f;
+float throttle = 0.0f;
 
 extern int _sbus_fd;
 
@@ -106,7 +115,7 @@ int mixer_mix_threadsafe(float *outputs, volatile uint16_t *limits)
 	}
 
 	in_mixer = true;
-	int mixcount = mixer_group.mix(&outputs[0], PX4IO_SERVO_COUNT);
+	int mixcount = mixer_group.mix(&outputs[0], PX4IO_SERVO_COUNT,flag);
 	*limits = mixer_group.get_saturation_status();
 	in_mixer = false;
 
@@ -116,8 +125,8 @@ int mixer_mix_threadsafe(float *outputs, volatile uint16_t *limits)
 void
 mixer_tick()
 {
-	/* check if the mixer got modified */
-	mixer_handle_text_create_mixer();
+	/* check if the mixer got modified  */
+	mixer_handle_text_create_mixer();// 读取混控文件
 
 	/* check that we are receiving fresh data from the FMU */
 	irqstate_t irq_flags = enter_critical_section();
@@ -183,7 +192,7 @@ mixer_tick()
 
 			if (r_status_flags & PX4IO_P_STATUS_FLAGS_FMU_OK) {
 
-				/* if allowed, mix from RC inputs directly up to available rc channels */
+				/* if allowed, mix from RC inputs directly up to available rc channels 如果允许，从RC输入直接混合到可用的RC通道*/
 				source = MIX_OVERRIDE_FMU_OK;
 
 			} else {
@@ -226,11 +235,11 @@ mixer_tick()
 				   );
 
 	/*
-	 * Check if FMU is still alive, if not, terminate the flight
+	 * Check if FMU is still alive, if not, terminate the flight 终止飞行。
 	 */
 	if (REG_TO_BOOL(r_setup_flighttermination) && 			/* Flight termination is allowed */
 	    (source == MIX_DISARMED) && 				/* and if we ended up not changing the default mixer */
-	    should_arm && 						/* and we should be armed, so we intended to provide outputs */
+	    should_arm && 						/* and we should be armed, so we intended to provide outputs旨在提供输出 */
 	    (r_status_flags & PX4IO_P_STATUS_FLAGS_FMU_INITIALIZED)) { 	/* and FMU is initialized */
 		atomic_modify_or(&r_setup_arming, PX4IO_P_SETUP_ARMING_FORCE_FAILSAFE); /* then FMU is dead -> terminate flight */
 	}
@@ -253,7 +262,7 @@ mixer_tick()
 	}
 
 	/*
-	 * Set simple mixer trim values. If the OK flag is set the mixer is fully loaded.
+	 * Set simple mixer trim values. If the OK flag is set the mixer is fully loaded.设置简单混合器微调值。如果设置了OK标志，则混控器已满负荷。
 	 */
 	if (update_trims && r_status_flags & PX4IO_P_STATUS_FLAGS_MIXER_OK) {
 		update_trims = false;
@@ -293,6 +302,8 @@ mixer_tick()
 		   && !(r_setup_arming & PX4IO_P_SETUP_ARMING_LOCKDOWN)) {
 
 		float	outputs[PX4IO_SERVO_COUNT];
+		float	outputs_change[PX4IO_SERVO_COUNT];
+		int k = 0;
 		unsigned mixed;
 
 		if (REG_TO_FLOAT(r_setup_slew_max) > FLT_EPSILON) {
@@ -313,10 +324,35 @@ mixer_tick()
 		/* mix */
 		mixed = mixer_mix_threadsafe(&outputs[0], &r_mixer_limits);
 
+		if (enable_to_water_tkof)
+		{
+			if(flag_change)
+			{
+				for (int i = 0;i<20; i++)
+				{
+					k = i;
+					output_reorder(outputs,outputs_change,flag_change,k);
+				}
+
+			}else
+			{
+				output_reorder(outputs,outputs_change,flag_change,k);
+			}
+		}
+
 		/* the pwm limit call takes care of out of band errors */
 		output_limit_calc(should_arm, should_arm_nothrottle, mixed, r_setup_pwm_reverse, r_page_servo_disarmed,
-				  r_page_servo_control_min, r_page_servo_control_max, outputs, r_page_servos, &pwm_limit);
+				  r_page_servo_control_min, r_page_servo_control_max, outputs_change, r_page_servos, &pwm_limit);
 
+		if(enable_to_water_tkof && flag_add)
+		{
+			output_add_no_roll(r_page_servos,sin_roll,throttle);
+		}
+
+		if(!flag_change)
+		{
+			output_correct(r_page_servos);
+		}
 		/* clamp unused outputs to zero */
 		for (unsigned i = mixed; i < PX4IO_SERVO_COUNT; i++) {
 			r_page_servos[i] = 0;
@@ -505,14 +541,21 @@ mixer_callback(uintptr_t handle,
 			control = NAN;
 		}
 	}
-
+	c4 = r_page_controls[CONTROL_PAGE_INDEX(actuator_controls_s::GROUP_INDEX_ATTITUDE, actuator_controls_s::INDEX_FLAPS)]/10000.0;
+	c6 = r_page_controls[CONTROL_PAGE_INDEX(actuator_controls_s::GROUP_INDEX_ATTITUDE, actuator_controls_s::INDEX_AIRBRAKES)]/10000.0;
+        sin_roll = REG_TO_FLOAT(r_page_controls[CONTROL_PAGE_INDEX(actuator_controls_s::GROUP_INDEX_ATTITUDE, actuator_controls_s::INDEX_SPOILERS)]);
+	throttle = r_page_controls[CONTROL_PAGE_INDEX(actuator_controls_s::GROUP_INDEX_ATTITUDE, actuator_controls_s::INDEX_THROTTLE)]/10000.0;
+	c21 = r_page_controls[CONTROL_PAGE_INDEX(2, actuator_controls_s::INDEX_ROLL)]/10000.0;
+	enable_to_water_tkof = (c21 != 0);
+	flag_change = (c4 != 0);
+	flag_add = (c6 != 0);
 	return 0;
 }
 
 /*
  * XXX error handling here should be more aggressive; currently it is
  * possible to get STATUS_FLAGS_MIXER_OK set even though the mixer has
- * not loaded faithfully.
+ * not loaded faithfully.这里的XXX错误处理应该更积极；当前可以设置STATUS_FLAGS_MIXER_OK，即使MIXER没有如实加载。
  */
 
 static char mixer_text[PX4IO_MAX_MIXER_LENGTH];		/* large enough for one mixer */
@@ -616,7 +659,7 @@ mixer_handle_text(const void *buffer, size_t length)
 			return 1;
 		}
 
-		/* append mixer text and nul-terminate, guard against overflow */
+		/* append mixer text and nul-terminate, guard against overflow 附加混音器文本和nul终止，防止溢出*/
 		memcpy(&mixer_text[mixer_text_length], msg->text, text_length);
 		mixer_text_length += text_length;
 		mixer_text[mixer_text_length] = '\0';

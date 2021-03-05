@@ -50,12 +50,13 @@
 //#define debug(fmt, args...)	syslog(fmt "\n", ##args)
 
 unsigned
-MixerGroup::mix(float *outputs, unsigned space)
+MixerGroup::mix(float *outputs, unsigned space, bool &flag)
 {
 	unsigned index = 0;
+	enabled = flag;
 
-	for (auto mixer : _mixers) {
-		index += mixer->mix(outputs + index, space - index);
+	for (auto mixer : _mixers) { //auto类型使得简单混控和多旋翼的对象可以在一个流程中进行
+		index += mixer->mix(outputs + index, space - index, enabled);//执行一次一个电机的混控，（多旋翼等）
 
 		if (index >= space) {
 			break;

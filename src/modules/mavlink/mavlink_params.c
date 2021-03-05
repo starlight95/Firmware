@@ -141,7 +141,7 @@ PARAM_DEFINE_INT32(MAV_FWDEXTSP, 1);
  * @value 2 Only multicast
  * @group MAVLink
  */
-PARAM_DEFINE_INT32(MAV_BROADCAST, 0);
+PARAM_DEFINE_INT32(MAV_BROADCAST, 1);
 
 /**
  * Parameter hash check.

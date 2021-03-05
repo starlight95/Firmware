@@ -69,11 +69,29 @@ typedef struct {
 	bool ramp_up; ///< if true, motors will ramp up from disarmed to min_output after arming
 } output_limit_t;
 
+
+// hrt_abstime water_flag_start;
+// hrt_abstime water_flag_diff;
+
 __EXPORT void output_limit_init(output_limit_t *limit);
 
 __EXPORT void output_limit_calc(const bool armed, const bool pre_armed, const unsigned num_channels,
 				const uint16_t reverse_mask, const uint16_t *disarmed_output,
 				const uint16_t *min_output, const uint16_t *max_output,
 				const float *output, uint16_t *effective_output, output_limit_t *limit);
+// __EXPORT void output_limit(const bool armed, const bool pre_armed, const unsigned num_channels,
+// 				const uint16_t reverse_mask, const uint16_t *disarmed_output,
+// 				const uint16_t *min_output, const uint16_t *max_output,
+// 				const float *output, uint16_t *effective_output, output_limit_t *limit, bool water_flag);
+
+__EXPORT void output_correct(uint16_t *effective_output);
+
+__EXPORT void output_reorder(const float *output, float *output_change,bool water_flag,int k_turn);
+
+void output_add(uint16_t *output,float sin_roll,float throttle); //roll controller is not used and we only compensate the front rotors.
+
+void output_add_with_roll(uint16_t *output,const float sin_roll,float throttle);// roll controller is used.
+void output_add_no_roll(uint16_t *output,const float sin_roll,float throttle);// roll controller is not used but we  compensate the full rotors.
+void output_correct_back(uint16_t *output,const float sin_roll);
 
 __END_DECLS

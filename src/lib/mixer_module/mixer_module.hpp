@@ -35,6 +35,7 @@
 
 #include <board_config.h>
 #include <drivers/drv_pwm_output.h>
+
 #include <lib/mixer/MixerGroup.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/output_limit/output_limit.h>
@@ -51,7 +52,9 @@
 #include <uORB/topics/multirotor_motor_limits.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/test_motor.h>
+#include <uORB/topics/vehicle_attitude.h>
 
+#include <lib/matrix/matrix/math.hpp>
 /**
  * @class OutputModuleInterface
  * Base class for an output module.
@@ -66,6 +69,7 @@ public:
 
 	/**
 	 * Callback to update the (physical) actuator outputs in the driver
+	 * 回调以更新驱动程序中的（物理）执行器输出
 	 * @param stop_motors if true, all motors must be stopped (if false, individual motors
 	 *                    might still be stopped via outputs[i] == disarmed_value)
 	 * @param outputs individual actuator outputs in range [min, max] or failsafe/disarmed value
@@ -86,6 +90,9 @@ public:
  *
  * It can also drive the scheduling of the OutputModuleInterface (via uORB callbacks
  * to reduce output latency).
+ * 这将处理混合、解锁/加锁以及该操作所需的所有订阅。
+*
+* 它还可以驱动OutputModuleInterface的调度（通过uORB回调来减少输出延迟）
  */
 class MixingOutput : public ModuleParams
 {
@@ -100,7 +107,7 @@ public:
 	/**
 	 * Contructor
 	 * @param max_num_outputs maximum number of supported outputs
-	 * @param interface Parent module for scheduling, parameter updates and callbacks
+	 * @param interface Parent module for scheduling, parameter updates and callbacks用于调度、参数更新和回调的父模块
 	 * @param scheduling_policy
 	 * @param support_esc_calibration true if the output module supports ESC calibration via max, then min setting
 	 * @param ramp_up true if motor ramp up from disarmed to min upon arming is wanted
@@ -115,13 +122,13 @@ public:
 	void printStatus() const;
 
 	/**
-	 * Call this regularly from Run(). It will call interface.updateOutputs().
+	 * Call this regularly from Run(). It will call interface.updateOutputs().从Run（）定期调用此函数。它将调用interface.updateOutputs（）
 	 * @return true if outputs were updated
 	 */
 	bool update();
 
 	/**
-	 * Check for subscription updates (e.g. after a mixer is loaded).
+	 * Check for subscription updates (e.g. after a mixer is loaded).检查订阅更新（例如，加载混音器后）。
 	 * Call this at the very end of Run() if allow_wq_switch
 	 * @param allow_wq_switch if true
 	 * @return true if subscriptions got changed
@@ -176,7 +183,8 @@ public:
 	int reorderedMotorIndex(int index) const;
 
 	void setIgnoreLockdown(bool ignore_lockdown) { _ignore_lockdown = ignore_lockdown; }
-
+        // friend class
+	bool enabled_to_add_back{false};
 protected:
 	void updateParams() override;
 
@@ -239,9 +247,15 @@ private:
 
 	uORB::PublicationMulti<actuator_outputs_s> _outputs_pub{ORB_ID(actuator_outputs), ORB_PRIO_DEFAULT};
 	uORB::PublicationMulti<multirotor_motor_limits_s> _to_mixer_status{ORB_ID(multirotor_motor_limits), ORB_PRIO_DEFAULT}; 	///< mixer status flags
+	uORB::Publication<actuator_controls_s>		_actuators_0_pub{ORB_ID(actuator_controls_0)};		//input for the mixer (roll,pitch,yaw,thrust)
+	uORB::Publication<actuator_controls_s>		_actuators_1_pub{ORB_ID(actuator_controls_1)};
 
 	actuator_controls_s _controls[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS] {};
 	actuator_armed_s _armed{};
+
+	uORB::Subscription	_vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
+	struct vehicle_attitude_s		_v_att;
+	matrix::Eulerf euler;
 
 	hrt_abstime _time_last_mix{0};
 	unsigned _max_topic_update_interval_us{0}; ///< max _control_subs topic update interval (0=unlimited)
@@ -270,6 +284,10 @@ private:
 	OutputModuleInterface &_interface;
 
 	perf_counter_t _control_latency_perf;
+
+	bool _water_takeoff_switch{true};     // 留作切换标志位
+        uint16_t last_output[MAX_ACTUATORS]{}; // 保存上一次的输出
+
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::MC_AIRMODE>) _param_mc_airmode,   ///< multicopter air-mode

@@ -99,7 +99,7 @@ public:
 	static HelicopterMixer		*from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, const char *buf,
 			unsigned &buflen);
 
-	unsigned			mix(float *outputs, unsigned space) override;
+	unsigned			mix(float *outputs, unsigned space,bool &flag) override;
 
 	void				groups_required(uint32_t &groups) override { groups |= (1 << 0); }
 

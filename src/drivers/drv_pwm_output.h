@@ -61,6 +61,7 @@ __BEGIN_DECLS
  */
 #define PWM_OUTPUT_BASE_DEVICE_PATH "/dev/pwm_output"
 #define PWM_OUTPUT0_DEVICE_PATH	"/dev/pwm_output0"
+#define PWM_OUTPUT1_DEVICE_PATH	"/dev/pwm_output1"
 
 #define PWM_OUTPUT_MAX_CHANNELS 16
 
@@ -148,7 +149,7 @@ struct pwm_output_rc_config {
  * ioctl() definitions
  *
  * Note that ioctls and ORB updates should not be mixed, as the
- * behaviour of the system in this case is not defined.
+ * behaviour of the system in this case is not defined.注意ioctl和ORB更新不应该混合使用，因为在这种情况下系统的行为没有定义。
  */
 #define _PWM_SERVO_BASE		0x2a00
 

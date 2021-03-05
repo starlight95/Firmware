@@ -69,6 +69,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("offboard_control_mode", 1000);
 	add_topic("position_controller_status", 500);
 	add_topic("position_setpoint_triplet", 200);
+	add_topic("pwm_input");
 	add_topic("radio_status");
 	add_topic("rate_ctrl_status", 200);
 	add_topic("rpm", 500);
@@ -95,6 +96,8 @@ void LoggedTopics::add_default_topics()
 	add_topic("vehicle_status", 200);
 	add_topic("vehicle_status_flags");
 	add_topic("vtol_vehicle_status", 200);
+	add_topic("water_takeoff",200);
+	add_topic("tiltrotor",200);
 	add_topic("yaw_estimator_status", 200);
 
 	// multi topics
@@ -140,6 +143,7 @@ void LoggedTopics::add_high_rate_topics()
 	add_topic("rate_ctrl_status", 20);
 	add_topic("sensor_combined");
 	add_topic("vehicle_angular_acceleration");
+	add_topic("vehicle_acceleration");
 	add_topic("vehicle_angular_velocity");
 	add_topic("vehicle_attitude");
 	add_topic("vehicle_attitude_setpoint");

@@ -276,7 +276,7 @@ MultirotorMixer::mix_airmode_rpy(float roll, float pitch, float yaw, float thrus
 }
 
 void
-MultirotorMixer::mix_airmode_disabled(float roll, float pitch, float yaw, float thrust, float *outputs)
+MultirotorMixer::mix_airmode_disabled(float roll, float pitch, float yaw, float thrust, float *outputs, bool &enabled)
 {
 	// Airmode disabled: never allow to increase the thrust to unsaturate a motor
 
@@ -306,7 +306,7 @@ MultirotorMixer::mix_airmode_disabled(float roll, float pitch, float yaw, float 
 
 	minimize_saturation(_tmp_array, outputs, _saturation_status);
 
-	// Mix yaw independently
+	// Mix yaw independently 再去掉yaw的影响 。
 	mix_yaw(yaw, outputs);
 }
 
@@ -333,12 +333,13 @@ void MultirotorMixer::mix_yaw(float yaw, float *outputs)
 }
 
 unsigned
-MultirotorMixer::mix(float *outputs, unsigned space)
+MultirotorMixer::mix(float *outputs, unsigned space ,bool &flag)
 {
+	enabled_1 = flag;
 	if (space < _rotor_count) {
 		return 0;
 	}
-
+	// 利用get_control 来获取不同组之间的控制输入量。
 	float roll    = math::constrain(get_control(0, 0) * _roll_scale, -1.0f, 1.0f);
 	float pitch   = math::constrain(get_control(0, 1) * _pitch_scale, -1.0f, 1.0f);
 	float yaw     = math::constrain(get_control(0, 2) * _yaw_scale, -1.0f, 1.0f);
@@ -359,7 +360,7 @@ MultirotorMixer::mix(float *outputs, unsigned space)
 
 	case Airmode::disabled:
 	default: // just in case: default to disabled
-		mix_airmode_disabled(roll, pitch, yaw, thrust, outputs);
+		mix_airmode_disabled(roll, pitch, yaw, thrust, outputs, enabled_1);
 		break;
 	}
 

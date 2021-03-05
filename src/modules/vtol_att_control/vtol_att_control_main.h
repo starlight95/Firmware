@@ -79,6 +79,8 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vtol_vehicle_status.h>
+#include <uORB/topics/water_takeoff.h>
+#include <uORB/topics/tiltrotor.h>
 
 #include "standard.h"
 #include "tailsitter.h"
@@ -111,6 +113,8 @@ public:
 	struct actuator_controls_s 			*get_actuators_mc_in() {return &_actuators_mc_in;}
 	struct actuator_controls_s 			*get_actuators_out0() {return &_actuators_out_0;}
 	struct actuator_controls_s 			*get_actuators_out1() {return &_actuators_out_1;}
+	struct actuator_controls_s 			*get_actuators_out2() {return &_actuators_out_2;}
+
 	struct airspeed_validated_s 				*get_airspeed() {return &_airspeed_validated;}
 	struct position_setpoint_triplet_s		*get_pos_sp_triplet() {return &_pos_sp_triplet;}
 	struct tecs_status_s 				*get_tecs_status() {return &_tecs_status;}
@@ -123,8 +127,10 @@ public:
 	struct vehicle_local_position_s 		*get_local_pos() {return &_local_pos;}
 	struct vehicle_local_position_setpoint_s	*get_local_pos_sp() {return &_local_pos_sp;}
 	struct vtol_vehicle_status_s			*get_vtol_vehicle_status() {return &_vtol_vehicle_status;}
-
+	struct manual_control_setpoint_s                *get_manual_control_setpoint() {return & _manual_control_sp;}
 	struct Params 					*get_params() {return &_params;}
+        struct water_takeoff_s                          *get_water_takeoff() {return &_w_takeoff;}
+	struct tiltrotor_s                              *get_tiltrotor() {return &_tilt_;}
 
 private:
 
@@ -146,11 +152,17 @@ private:
 	uORB::Subscription _v_att_sub{ORB_ID(vehicle_attitude)};		//vehicle attitude subscription
 	uORB::Subscription _v_control_mode_sub{ORB_ID(vehicle_control_mode)};	//vehicle control mode subscription
 	uORB::Subscription _vehicle_cmd_sub{ORB_ID(vehicle_command)};
+	uORB::Subscription _water_takeoff_sub{ORB_ID(water_takeoff)};
+	uORB::Subscription _tiltrotor_sub{ORB_ID(tiltrotor)};
+
 
 	uORB::Publication<actuator_controls_s>		_actuators_0_pub{ORB_ID(actuator_controls_0)};		//input for the mixer (roll,pitch,yaw,thrust)
 	uORB::Publication<actuator_controls_s>		_actuators_1_pub{ORB_ID(actuator_controls_1)};
+	uORB::Publication<actuator_controls_s>		_actuators_2_pub{ORB_ID(actuator_controls_2)};
 	uORB::Publication<vehicle_attitude_setpoint_s>	_v_att_sp_pub{ORB_ID(vehicle_attitude_setpoint)};
 	uORB::Publication<vtol_vehicle_status_s>	_vtol_vehicle_status_pub{ORB_ID(vtol_vehicle_status)};
+	uORB::Publication<tiltrotor_s> 			_tiltrotor_pub{ORB_ID(tiltrotor)};
+	uORB::Publication<water_takeoff_s>              _water_takeoff_pub{ORB_ID(water_takeoff};
 
 	orb_advert_t	_mavlink_log_pub{nullptr};	// mavlink log uORB handle
 
@@ -162,6 +174,8 @@ private:
 	actuator_controls_s			_actuators_mc_in{};	//actuator controls from mc_att_control
 	actuator_controls_s			_actuators_out_0{};	//actuator controls going to the mc mixer
 	actuator_controls_s			_actuators_out_1{};	//actuator controls going to the fw mixer (used for elevons)
+	actuator_controls_s 			_actuators_out_2{};     //used to send messege
+
 
 	airspeed_validated_s 				_airspeed_validated{};			// airspeed
 	manual_control_setpoint_s		_manual_control_sp{}; //manual control setpoint
@@ -174,6 +188,8 @@ private:
 	vehicle_local_position_s		_local_pos{};
 	vehicle_local_position_setpoint_s	_local_pos_sp{};
 	vtol_vehicle_status_s 			_vtol_vehicle_status{};
+	water_takeoff_s                         _w_takeoff{};
+	tiltrotor_s                             _tilt_{};
 
 	Params _params{};	// struct holding the parameters
 
@@ -199,10 +215,14 @@ private:
 		param_t front_trans_timeout;
 		param_t mpc_xy_cruise;
 		param_t fw_motors_off;
+		param_t mc_motors_off;
 		param_t diff_thrust;
 		param_t diff_thrust_scale;
 		param_t down_pitch_max;
 		param_t forward_thrust_scale;
+		param_t mc_on_fmu;
+		param_t tkoff_on_water;
+		param_t att_sp_tk;
 	} _params_handles{};
 
 	/* for multicopters it is usual to have a non-zero idle speed of the engines

@@ -31,7 +31,8 @@
                 "${workspaceFolder}/src/lib",
                 "${workspaceFolder}/src/lib",
                 "${workspaceFolder}/src/lib/matrix",
-                "${workspaceFolder}/src/modules"
+                "${workspaceFolder}/src/modules",
+                "${workspaceFolder}/build/px4_sitl_default/src/lib"
             ],
             "intelliSenseMode": "${default}"
         },

@@ -74,6 +74,7 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/ekf2_timestamps.h>
+#include <uORB/topics/vehicle_global_position.h>
 #include <uORB/uORB.h>
 
 
@@ -129,6 +130,7 @@ private:
 	int	_manual_control_sub{-1};	/**< notification of manual control updates */
 	int	_vcontrol_mode_sub{-1};		/**< vehicle status subscription */
 	int	_sensor_combined_sub{-1};	/**< sensor combined subscription */
+        int     _vehicle_global_position_sub{-1};
 
 	actuator_controls_s		_actuators {};		/**< actuator control inputs */
 	manual_control_setpoint_s	_manual {};		/**< r/c channel data */
@@ -138,6 +140,7 @@ private:
 	vehicle_control_mode_s		_vcontrol_mode {};	/**< vehicle control mode */
 	sensor_combined_s		_sensor_combined{};
 	vehicle_local_position_s	_local_pos{};		/**< vehicle local position */
+	vehicle_global_position_s       _vehicle_global_position;/**< vehicle global position */
 
 
 	SubscriptionData<vehicle_acceleration_s>		_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
@@ -179,6 +182,7 @@ private:
 	void 	vehicle_attitude_poll();
 	void	vehicle_attitude_setpoint_poll();
 	void	vehicle_local_position_poll();
+	void    vehicle_global_position_poll();
 
 	/**
 	 * Control Attitude

@@ -53,12 +53,14 @@
 #include <uORB/topics/multirotor_motor_limits.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/rate_ctrl_status.h>
+#include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_angular_acceleration.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/water_takeoff.h>
 
 class MulticopterRateControl : public ModuleBase<MulticopterRateControl>, public ModuleParams, public px4::WorkItem
 {
@@ -98,11 +100,13 @@ private:
 	uORB::Subscription _manual_control_sp_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription _motor_limits_sub{ORB_ID(multirotor_motor_limits)};
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
+	uORB::Subscription _v_att_sub{ORB_ID(vehicle_attitude)};
 	uORB::Subscription _v_control_mode_sub{ORB_ID(vehicle_control_mode)};
 	uORB::Subscription _v_rates_sp_sub{ORB_ID(vehicle_rates_setpoint)};
 	uORB::Subscription _vehicle_angular_acceleration_sub{ORB_ID(vehicle_angular_acceleration)};
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription _water_takeoff_sub{ORB_ID(water_takeoff)};
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_angular_velocity_sub{this, ORB_ID(vehicle_angular_velocity)};
 
@@ -110,11 +114,14 @@ private:
 	uORB::PublicationMulti<rate_ctrl_status_s>	_controller_status_pub{ORB_ID(rate_ctrl_status), ORB_PRIO_DEFAULT};	/**< controller status publication */
 	uORB::Publication<landing_gear_s>		_landing_gear_pub{ORB_ID(landing_gear)};
 	uORB::Publication<vehicle_rates_setpoint_s>	_v_rates_sp_pub{ORB_ID(vehicle_rates_setpoint)};			/**< rate setpoint publication */
+	uORB::Publication<water_takeoff_s>              _water_takeoff_pub{ORB_ID(water_takeoff)};
 
 	landing_gear_s 			_landing_gear{};
 	manual_control_setpoint_s	_manual_control_sp{};
 	vehicle_control_mode_s		_v_control_mode{};
 	vehicle_status_s		_vehicle_status{};
+	vehicle_attitude_s              _v_att{};
+	water_takeoff_s                 _w_takeoff{};
 
 	bool _actuators_0_circuit_breaker_enabled{false};	/**< circuit breaker to suppress output */
 	bool _landed{true};
@@ -129,8 +136,13 @@ private:
 	float		_thrust_sp{0.0f};		/**< thrust setpoint */
 
 	bool _gear_state_initialized{false};		/**< true if the gear state has been initialized */
+	bool water_openloop = false;
+	bool openloop_once = false;
+	float att_sp_tkof = 0.0f;
 
 	hrt_abstime _last_run{0};
+	hrt_abstime water_takeoff_time{0};
+	hrt_abstime open_loop_time{0};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MC_ROLLRATE_P>) _param_mc_rollrate_p,
@@ -168,7 +180,8 @@ private:
 
 		(ParamBool<px4::params::MC_BAT_SCALE_EN>) _param_mc_bat_scale_en,
 
-		(ParamInt<px4::params::CBRK_RATE_CTRL>) _param_cbrk_rate_ctrl
+		(ParamInt<px4::params::CBRK_RATE_CTRL>) _param_cbrk_rate_ctrl,
+		(ParamFloat<px4::params::MC_ATT_SP_TKOF>) _param_mc_att_sp_tkof
 	)
 
 	matrix::Vector3f _acro_rate_max;	/**< max attitude rates in acro mode */

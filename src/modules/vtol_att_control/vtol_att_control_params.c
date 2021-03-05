@@ -281,6 +281,17 @@ PARAM_DEFINE_FLOAT(VT_F_TR_OL_TM, 6.0f);
 PARAM_DEFINE_INT32(VT_FW_MOT_OFFID, 0);
 
 /**
+ * The channel number of motors that must be turned off in multi rotor mode.
+ *
+ * @min 0
+ * @max 12345678
+ * @increment 1
+ * @decimal 0
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_INT32(VT_MC_MOT_OFFID, 0);
+
+/**
  * The channel number of motors which provide lift during hover.
  *
  * @min 0
@@ -315,3 +326,32 @@ PARAM_DEFINE_INT32(VT_FW_DIFTHR_EN, 0);
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_FLOAT(VT_FW_DIFTHR_SC, 0.1f);
+
+/**
+ * Enable the usage of AUX outputs for hover motors.
+ *
+ * Set this parameter to true if the vehicle's hover motors are connected to the FMU (AUX) port.
+ * Not required for boards that only have a FMU, and no IO.
+ * Only applies for standard VTOL and tiltrotor.
+ *
+ * @boolean
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_INT32(VT_MC_ON_FMU, 0);
+
+/**
+ * Enable takeoff on surface.
+ *
+ *
+ * @boolean
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_INT32(VT_TKOFF_ON_WT, 0);
+
+/**
+ * parameter to define to use the auto_outputs or not.
+ *
+ *
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_ATT_SP_TK, 0.55f);

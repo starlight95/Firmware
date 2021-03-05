@@ -672,6 +672,8 @@ PX4IO::init()
 	 * armed state, FMU is recovering from an in-air reset.
 	 * Read back status and request the commander to arm
 	 * in this case.
+	 * 检查IO飞行状态-如果FMU被标记为处于待命状态，则FMU正在从空中复位中恢复。
+         * 在这种情况下，读取状态并请求指挥官待命
 	 */
 
 	uint16_t reg;
@@ -698,6 +700,8 @@ PX4IO::init()
 		/* WARNING: COMMANDER app/vehicle status must be initialized.
 		 * If this fails (or the app is not started), worst-case IO
 		 * remains untouched (so manual override is still available).
+		 * 指挥官应用程序/车辆状态必须初始化。
+                 * 如果失败（或应用程序未启动），则最坏情况下的IO将保持不变（因此仍可以使用手动覆盖）。
 		 */
 
 		uORB::Subscription actuator_armed_sub{ORB_ID(actuator_armed)};
@@ -707,7 +711,7 @@ PX4IO::init()
 		uint64_t try_start_time = hrt_absolute_time();
 
 		/* keep checking for an update, ensure we got a arming information,
-		   not something that was published a long time ago. */
+		   not something that was published a long time ago. 继续检查更新，确保我们得到了一个装备信息，而不是很久以前发布的。*/
 		do {
 			if (actuator_armed_sub.update(&actuator_armed)) {
 				// updated data, exit loop
@@ -1060,16 +1064,16 @@ PX4IO::task_main()
 				/* Bypass IO safety switch logic by setting FORCE_SAFETY_OFF */
 				(void)io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_FORCE_SAFETY_OFF, circuit_breaker_io_safety_enabled);
 
-				/* Check if the flight termination circuit breaker has been updated */
+				/* Check if the flight termination circuit breaker has been updated 检查飞行终止断路器是否已更新*/
 				_cb_flighttermination = circuit_breaker_enabled("CBRK_FLIGHTTERM", CBRK_FLIGHTTERM_KEY);
-				/* Tell IO that it can terminate the flight if FMU is not responding or if a failure has been reported by the FailureDetector logic */
+				/* Tell IO that it can terminate the flight if FMU is not responding or if a failure has been reported by the FailureDetector logic 告诉IO如果FMU没有响应或者故障检测器逻辑报告了故障，它可以终止飞行*/
 				(void)io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_ENABLE_FLIGHTTERMINATION, !_cb_flighttermination);
 
 				param_get(param_find("RC_RSSI_PWM_CHAN"), &_rssi_pwm_chan);
 				param_get(param_find("RC_RSSI_PWM_MAX"), &_rssi_pwm_max);
 				param_get(param_find("RC_RSSI_PWM_MIN"), &_rssi_pwm_min);
 
-				param_t thermal_param = param_find("SENS_EN_THERMAL");
+				param_t thermal_param = param_find("SENS_EN_THERMAL");// 传感器温度的热控制
 
 				if (thermal_param != PARAM_INVALID) {
 
@@ -1103,11 +1107,11 @@ PX4IO::task_main()
 					int32_t ival;
 
 					/* fill the channel reverse mask from parameters */
-					sprintf(pname, "PWM_MAIN_REV%u", i + 1);
+					sprintf(pname, "PWM_MAIN_REV%u", i + 1);//int sprintf(char *string, char *format [,argument,...]); format是字符串，包含了要被写入到字符串 string 的文本。
 					param_t param_h = param_find(pname);
 
 					if (param_h != PARAM_INVALID) {
-						param_get(param_h, &ival);
+						param_get(param_h, &ival);//复制参数值到引用处
 						pwm_invert_mask |= ((int16_t)(ival != 0)) << i;
 					}
 				}
@@ -1265,7 +1269,7 @@ PX4IO::io_set_control_groups()
 }
 
 int
-PX4IO::io_set_control_state(unsigned group)
+PX4IO::io_set_control_state(unsigned group)   // maybe the point of changing output
 {
 	actuator_controls_s	controls{};	///< actuator outputs
 
@@ -1310,7 +1314,7 @@ PX4IO::io_set_control_state(unsigned group)
 	uint16_t regs[sizeof(controls.control) / sizeof(controls.control[0])] = {};
 
 	for (unsigned i = 0; (i < _max_controls) && (i < sizeof(controls.control) / sizeof(controls.control[0])); i++) {
-		/* ensure FLOAT_TO_REG does not produce an integer overflow */
+		/* ensure FLOAT_TO_REG does not produce an integer overflow 确保FLOAT_TO_REG不会产生整数溢出 */
 		const float ctrl = math::constrain(controls.control[i], -1.0f, 1.0f);
 
 		if (!isfinite(ctrl)) {
@@ -1853,7 +1857,10 @@ PX4IO::io_get_raw_rc_input(input_rc_s &input_rc)
 	input_rc.timestamp_last_signal = _rc_last_valid;
 
 	/* FIELDS NOT SET HERE */
-	/* input_rc.input_source is set after this call XXX we might want to mirror the flags in the RC struct */
+	/* input_rc.input_source is set after this call XXX we might want to mirror the flags in the RC struct
+	   超过9通道的时候，将通道截断成两组（因为最多18个通道）。
+	   PX4IO_PAGE_RAW_RC_INPUT : rc寄存器，可能从io——firmware来的。
+	 */
 
 	if (channel_count > 9) {
 		ret = io_reg_get(PX4IO_PAGE_RAW_RC_INPUT, PX4IO_P_RAW_RC_BASE + 9, &regs[prolog + 9], channel_count - 9);
@@ -1948,7 +1955,7 @@ PX4IO::io_publish_pwm_outputs()
 	outputs.timestamp = hrt_absolute_time();
 	outputs.noutputs = _max_actuators;
 
-	/* convert from register format to float */
+	/* convert from register format to float 从寄存器格式转换为浮点格式 */
 	for (unsigned i = 0; i < _max_actuators; i++) {
 		outputs.output[i] = ctl[i];
 	}

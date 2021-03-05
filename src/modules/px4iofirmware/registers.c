@@ -423,7 +423,7 @@ registers_set(uint8_t page, uint8_t offset, const uint16_t *values, unsigned num
 			while ((offset < PX4IO_SERVO_COUNT) && (num_values > 0)) {
 
 				if (*values == 0) {
-					/* 0 means disabling always PWM */
+					/* 0 means disabling always PWM 0表示始终禁用脉宽调制*/
 					r_page_servo_disarmed[offset] = 0;
 
 				} else if (*values < PWM_LOWEST_MIN) {
@@ -964,7 +964,7 @@ registers_get(uint8_t page, uint8_t offset, uint16_t **values, unsigned *num_val
 		break;
 
 	/*
-	 * Pages that are just a straight read of the register state.
+	 * Pages that are just a straight read of the register state.直接读取寄存器状态的页面
 	 */
 
 	/* status pages */

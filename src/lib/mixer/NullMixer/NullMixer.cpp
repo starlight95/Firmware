@@ -38,7 +38,7 @@
 #include <ctype.h>
 
 unsigned
-NullMixer::mix(float *outputs, unsigned space)
+NullMixer::mix(float *outputs, unsigned space,bool &flag)
 {
 	if (space > 0) {
 		*outputs = NAN;

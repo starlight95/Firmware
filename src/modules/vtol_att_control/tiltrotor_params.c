@@ -85,3 +85,63 @@ PARAM_DEFINE_FLOAT(VT_TILT_FW, 1.0f);
  * @group VTOL Attitude Control
  */
 PARAM_DEFINE_FLOAT(VT_TRANS_P2_DUR, 0.5f);
+
+/**
+ * Position of tilt servo in fw mode
+ *
+ * @min 0.0
+ * @max 1.0
+ * @increment 0.01
+ * @decimal 3
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_TILT_FW_ERR1, 0.14f);
+
+/**
+ * Position of tilt servo in fw mode
+ *
+ * @min 0.0
+ * @max 1.0
+ * @increment 0.01
+ * @decimal 3
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_TILT_FW_ERR2, 0.09f);
+
+/**
+ * Position of tilt servo in fw mode
+ *
+ * @min 0.0
+ * @max 1.0
+ * @increment 0.01
+ * @decimal 3
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_TILT_FW_ERR3, 0.06f);
+
+/**
+ * Position of tilt servo in fw mode
+ *
+ * @min 0.0
+ * @max 1.0
+ * @increment 0.01
+ * @decimal 3
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_FLOAT(VT_TILT_FW_ERR4, 0.0f);
+
+/**
+ * parameter to define to use the auto_outputs or not.
+ *
+ *
+ * @group VTOL Attitude Control
+ */
+PARAM_DEFINE_INT32(VT_TILT_AUTO, 0);
+
+// /**
+//  * parameter to define to use the auto_outputs or not.
+//  *
+//  *
+//  * @group VTOL Attitude Control
+//  */
+// PARAM_DEFINE_FLOAT(VT_ATT_SP_TK, 0.55f);

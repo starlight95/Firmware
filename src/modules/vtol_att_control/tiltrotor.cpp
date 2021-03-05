@@ -60,6 +60,11 @@ Tiltrotor::Tiltrotor(VtolAttitudeControl *attc) :
 	_params_handles_tiltrotor.tilt_transition = param_find("VT_TILT_TRANS");
 	_params_handles_tiltrotor.tilt_fw = param_find("VT_TILT_FW");
 	_params_handles_tiltrotor.front_trans_dur_p2 = param_find("VT_TRANS_P2_DUR");
+	_params_handles_tiltrotor.tilt_err_1 = param_find("VT_TILT_FW_ERR1");
+	_params_handles_tiltrotor.tilt_err_2 = param_find("VT_TILT_FW_ERR2");
+	_params_handles_tiltrotor.tilt_err_3 = param_find("VT_TILT_FW_ERR3");
+	_params_handles_tiltrotor.tilt_err_4 = param_find("VT_TILT_FW_ERR4");
+	_params_handles_tiltrotor.auto_outputs = param_find("VT_TILT_AUTO");
 }
 
 void
@@ -82,6 +87,17 @@ Tiltrotor::parameters_update()
 	/* vtol front transition phase 2 duration */
 	param_get(_params_handles_tiltrotor.front_trans_dur_p2, &v);
 	_params_tiltrotor.front_trans_dur_p2 = v;
+
+	param_get(_params_handles_tiltrotor.tilt_err_1, &v);
+	_params_tiltrotor.tilt_err_1 = v;
+	param_get(_params_handles_tiltrotor.tilt_err_2, &v);
+	_params_tiltrotor.tilt_err_2 = v;
+	param_get(_params_handles_tiltrotor.tilt_err_3, &v);
+	_params_tiltrotor.tilt_err_3 = v;
+	param_get(_params_handles_tiltrotor.tilt_err_4, &v);
+	_params_tiltrotor.tilt_err_4 = v;
+	param_get(_params_handles_tiltrotor.auto_outputs, &v);
+	_params_tiltrotor.auto_outputs = v;
 }
 
 void Tiltrotor::update_vtol_state()
@@ -217,7 +233,7 @@ void Tiltrotor::update_fw_state()
 	VtolType::update_fw_state();
 
 	// make sure motors are tilted forward
-	_tilt_control = _params_tiltrotor.tilt_fw;
+	_tilt_control = _params_tiltrotor.tilt_fw;// 这个就是actuator_controls_1 中4的控制值，也就是1 4的来历。
 }
 
 void Tiltrotor::update_transition_state()
@@ -280,13 +296,18 @@ void Tiltrotor::update_transition_state()
 		_mc_roll_weight = 0.0f;
 		_mc_yaw_weight = 0.0f;
 
-		// ramp down motors not used in fixed-wing flight (setting MAX_PWM down scales the given output into the new range)
+		// ramp down motors not used in fixed-wing flight 关闭不用的电机(setting MAX_PWM down scales the given output into the new range)
 		int ramp_down_value = (1.0f - time_since_trans_start / _params_tiltrotor.front_trans_dur_p2) *
 				      (PWM_DEFAULT_MAX - PWM_DEFAULT_MIN) + PWM_DEFAULT_MIN;
 
 
 		_motor_state = set_motor_state(_motor_state, motor_state::VALUE, ramp_down_value);
 
+		int ramp_up_value =  (time_since_trans_start / _params_tiltrotor.front_trans_dur_p2) *
+				      (PWM_DEFAULT_MAX - PWM_DEFAULT_MIN) + PWM_DEFAULT_MIN;
+
+
+		_motor_state = set_motor_state(_motor_state, motor_state::VALUE, ramp_up_value);
 
 		_thrust_transition = -_mc_virtual_att_sp->thrust_body[2];
 
@@ -338,6 +359,51 @@ void Tiltrotor::waiting_on_tecs()
 	_v_att_sp->thrust_body[0] = _thrust_transition;
 }
 
+void Tiltrotor::gen_virutal_mc_controls()
+{
+	bool auto_out =_params_tiltrotor.auto_outputs;
+	if((_manual_control_setpoint->arm_switch == manual_control_setpoint_s::SWITCH_POS_ON)&&(_manual_control_setpoint->transition_switch != manual_control_setpoint_s::SWITCH_POS_ON) && auto_out)
+	{
+		if(start_flag == 1)
+	        {
+			start_time= hrt_absolute_time();
+		        start_flag = 0;
+		        takeoff_flag = 1;
+	        }
+		float time_since_start = (float)(hrt_absolute_time() - start_time)*1e-6f;
+
+
+	        if(time_since_start>5.0f)
+	        {
+		        if(takeoff_flag == 1)
+		        {
+			        takeoff_time= hrt_absolute_time();
+			        takeoff_flag = 0;
+
+		        }
+			float time_since_takeoff = (float)(hrt_absolute_time() - takeoff_time)*1e-6f;
+			if(time_since_takeoff<=5.0f)
+			{
+				_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = 0.15f*time_since_takeoff/5.0f;
+		        }
+			else if ((time_since_takeoff>=5.0f) && (time_since_takeoff<=10.0f))
+		        {
+		                _actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = 0.15f;
+		        }
+		        else if (time_since_takeoff>=10.0f)
+		        {
+				_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = 0.15f-0.15f*(time_since_takeoff-10)/5.0f;
+		        }
+
+			if(_manual_control_setpoint->arm_switch == manual_control_setpoint_s::SWITCH_POS_OFF)
+			{
+				start_flag  = 1;
+			}
+		}
+
+	}
+}
+
 /**
 * Write data to actuator output topic.
 */
@@ -355,9 +421,9 @@ void Tiltrotor::fill_actuator_outputs()
 		_actuators_mc_in->control[actuator_controls_s::INDEX_YAW] * _mc_yaw_weight;
 
 	if (_vtol_schedule.flight_mode == vtol_mode::FW_MODE) {
-		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
+		_actuators_out_1->control[actuator_controls_s::INDEX_THROTTLE] =
 			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE];
-
+                _actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
 		/* allow differential thrust if enabled */
 		if (_params->diff_thrust == 1) {
 			_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
@@ -366,19 +432,76 @@ void Tiltrotor::fill_actuator_outputs()
 
 	} else {
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
-			_actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE] * _mc_throttle_weight;
+		_actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE] * _mc_throttle_weight;
+		// gen_virutal_mc_controls();
+		_actuators_out_1->control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
 	}
+
+	if(control4)
+	{
+		_actuators_out_0->control[actuator_controls_s::INDEX_FLAPS] = 1.0f;
+	}
+	_actuators_out_0->control[actuator_controls_s::INDEX_SPOILERS] = control5;
+	_actuators_out_0->control[actuator_controls_s::INDEX_AIRBRAKES] = control6;
 
 	// Fixed wing output
 	_actuators_out_1->timestamp = hrt_absolute_time();
 	_actuators_out_1->timestamp_sample = _actuators_fw_in->timestamp_sample;
 
-	_actuators_out_1->control[4] = _tilt_control;
+	// if (_vtol_schedule.flight_mode == vtol_mode::FW_MODE) {
+	// 	_tilt_control1 = (_tilt_control+21.0f)/126.0f;
+	//         _tilt_control2 = (_tilt_control+21.0f)/126.0f;
+	// 	_tilt_control3 = _tilt_control/116.0f;
+        //         _tilt_control4 = _tilt_control/116.0f;
+
+	// }else{
+
+	// }
+	if (!enable_to_water_tkoff)
+	{
+		_tilt_control1 = _tilt_control*90.0f/132.0f;
+		_tilt_control2 = _tilt_control*90.0f/132.0f;
+		_tilt_control3 = _tilt_control*90.0f/116.0f;
+		_tilt_control4 = _tilt_control*90.0f/116.0f;
+
+	}else
+	{
+		if(!can_not_trun_front_more)
+		{
+
+			_tilt_control1 = (__tilt_control_1+11.0f)/132.0f;
+			_tilt_control2 = (__tilt_control_2+11.0f)/132.0f;
+			_tilt_control3 = __tilt_control/116.0f;
+			_tilt_control4 = __tilt_control/116.0f;
+
+		}else
+		{
+			if (!water_takeoff&&get_45_deg)  // 暂时不会进
+			{
+				_tilt_control1 = (11.0f)/132.0f;
+				_tilt_control2 = (11.0f)/132.0f;
+				_tilt_control3 = (0.0f)/116.0f;
+				_tilt_control4 = (0.0f)/116.0f;
+				can_not_trun_front_more = true;
+
+			}else
+			{
+				_tilt_control1 = (__tilt_control)/132.0f;
+				_tilt_control2 = (__tilt_control)/132.0f;
+				_tilt_control3 = __tilt_control/116.0f;
+				_tilt_control4 = __tilt_control/116.0f;
+				water_takeoff = false;
+			}
+		}
+
+	}
+
 
 	if (_params->elevons_mc_lock && _vtol_schedule.flight_mode == vtol_mode::MC_MODE) {
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = 0.0f;
 		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = 0.0f;
 		_actuators_out_1->control[actuator_controls_s::INDEX_YAW] = 0.0f;
+
 
 	} else {
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] =
@@ -388,6 +511,13 @@ void Tiltrotor::fill_actuator_outputs()
 		_actuators_out_1->control[actuator_controls_s::INDEX_YAW] =
 			_actuators_fw_in->control[actuator_controls_s::INDEX_YAW];
 	}
+
+	_actuators_out_1->control[4] = _tilt_control1;
+	_actuators_out_1->control[5] = _tilt_control2;
+	_actuators_out_1->control[6] = _tilt_control3;
+	_actuators_out_1->control[7] = _tilt_control4;
+
+	_actuators_out_2->control[0] = enable_to_water_tkoff;
 }
 
 /*
@@ -396,7 +526,7 @@ void Tiltrotor::fill_actuator_outputs()
 
 float Tiltrotor::thrust_compensation_for_tilt()
 {
-	// only compensate for tilt angle up to 0.5 * max tilt
+	// only compensate补偿 for tilt angle up to 0.5 * max tilt
 	float compensated_tilt = math::constrain(_tilt_control, 0.0f, 0.5f);
 
 	// increase vertical thrust by 1/cos(tilt), limmit to [-1,0]

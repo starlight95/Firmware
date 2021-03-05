@@ -25,7 +25,7 @@ px4_add_board(
 		#camera_capture
 		#camera_trigger
 		#differential_pressure # all available differential pressure drivers
-		differential_pressure/ms4525
+		##differential_pressure/ms4525
 		#distance_sensor # all available distance sensor drivers
 		#distance_sensor/ll40ls
 		#distance_sensor/sf0x
@@ -64,7 +64,7 @@ px4_add_board(
 		tone_alarm
 		#uavcan
 	MODULES
-		airspeed_selector
+		##airspeed_selector
 		#attitude_estimator_q
 		battery_status
 		#camera_feedback
@@ -91,7 +91,8 @@ px4_add_board(
 		#sih
 		#temperature_compensation
 		vmount
-		#vtol_att_control
+		vtol_att_control
+                
 	SYSTEMCMDS
 		bl_update
 		#config

@@ -114,7 +114,7 @@ PARAM_DEFINE_FLOAT(FD_FAIL_P_TTRI, 0.3);
  * @reboot_required true
  * @group Failure Detector
  */
-PARAM_DEFINE_INT32(FD_EXT_ATS_EN, 0);
+PARAM_DEFINE_INT32(FD_EXT_ATS_EN, 1);
 
 /**
  * The PWM threshold from external automatic trigger system for engaging failsafe.

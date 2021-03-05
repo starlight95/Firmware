@@ -131,7 +131,7 @@
 
 /**
  * Abstract class defining a mixer mixing zero or more inputs to
- * one or more outputs.
+ * one or more outputs.定义混频器的抽象类，混频器将零个或多个输入混合到一个或多个输出
  */
 class Mixer : public ListNode<Mixer *>
 {
@@ -171,10 +171,10 @@ public:
 	 * Perform the mixing function.
 	 *
 	 * @param outputs		Array into which mixed output(s) should be placed.
-	 * @param space			The number of available entries in the output array;
-	 * @return			The number of entries in the output array that were populated.
+	 * @param space			The number of available entries in the output array;输出数组的可用条目数
+	 * @return			The number of entries in the output array that were populated.输出数组的已用条目数
 	 */
-	virtual unsigned		mix(float *outputs, unsigned space) = 0;
+	virtual unsigned		mix(float *outputs, unsigned space, bool &flag) = 0;
 
 	/**
 	 * Get the saturation status.
@@ -231,12 +231,13 @@ public:
 
 protected:
 
-	/** client-supplied callback used when fetching control values */
+	/** client-supplied callback used when fetching control values 获取控件值时使用的客户端提供的回调*/
 	ControlCallback			_control_cb;
 	uintptr_t			_cb_handle;
+	bool enabled_1 =  true;
 
 	/**
-	 * Invoke the client callback to fetch a control value.
+	 * Invoke the client callback to fetch a control value.调用客户端回调以获取控件值
 	 *
 	 * @param group			Control group to fetch from.
 	 * @param index			Control index to fetch.

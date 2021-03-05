@@ -177,6 +177,8 @@ private:
 	actuator_controls_s 	_controls;
 	MotorData_t 			Motor[MAX_MOTORS];
 
+	bool flag = false;
+
 	static int				task_main_trampoline(int argc, char *argv[]);
 	int					task_main();
 
@@ -544,7 +546,7 @@ MK::task_main()
 				if (_mixers != nullptr) {
 
 					/* do mixing */
-					outputs.noutputs = _mixers->mix(&outputs.output[0], _num_outputs);
+					outputs.noutputs = _mixers->mix(&outputs.output[0], _num_outputs, flag);
 					outputs.timestamp = hrt_absolute_time();
 
 					/* iterate actuators */
