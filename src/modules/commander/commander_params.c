@@ -118,7 +118,7 @@ PARAM_DEFINE_INT32(COM_HLDL_LOSS_T, 120);
 /**
  * High Latency Datalink regain time threshold
  *
- * After a data link loss: after this this amount of seconds with a healthy datalink the 'datalink loss'
+ * After a data link loss: after this number of seconds with a healthy datalink the 'datalink loss'
  * flag is set back to false
  *
  * @group Commander
@@ -174,7 +174,7 @@ PARAM_DEFINE_FLOAT(COM_EF_TIME, 10.0f);
 /**
  * RC loss time threshold
  *
- * After this amount of seconds without RC connection the rc lost flag is set to true
+ * After this amount of seconds without RC connection it's considered lost and not used anymore
  *
  * @group Commander
  * @unit s
@@ -184,6 +184,23 @@ PARAM_DEFINE_FLOAT(COM_EF_TIME, 10.0f);
  * @increment 0.1
  */
 PARAM_DEFINE_FLOAT(COM_RC_LOSS_T, 0.5f);
+
+/**
+ * Delay between RC loss and configured reaction
+ *
+ * RC signal not updated -> still use data for COM_RC_LOSS_T seconds
+ * Consider RC signal lost -> wait COM_RCL_ACT_T seconds on the spot waiting to regain signal
+ * React with failsafe action NAV_RCL_ACT
+ *
+ * A zero value disables the delay.
+ *
+ * @group Commander
+ * @unit s
+ * @min 0.0
+ * @max 25.0
+ * @decimal 3
+ */
+PARAM_DEFINE_FLOAT(COM_RCL_ACT_T, 15.0f);
 
 /**
  * Home set horizontal threshold
@@ -214,6 +231,18 @@ PARAM_DEFINE_FLOAT(COM_HOME_H_T, 5.0f);
 PARAM_DEFINE_FLOAT(COM_HOME_V_T, 10.0f);
 
 /**
+ * Allows setting the home position after takeoff
+ *
+ * If set to true, the autopilot is allowed to set its home position after takeoff
+ * The true home position is back-computed if a local position is estimate if available.
+ * If no local position is available, home is set to the current position.
+ *
+ * @boolean
+ * @group Commander
+ */
+PARAM_DEFINE_INT32(COM_HOME_IN_AIR, 0);
+
+/**
  * RC control input mode
  *
  * The default value of 0 requires a valid RC transmitter setup.
@@ -238,6 +267,7 @@ PARAM_DEFINE_INT32(COM_RC_IN_MODE, 0);
  * @group Commander
  * @min 100
  * @max 1500
+ * @unit ms
  */
 PARAM_DEFINE_INT32(COM_RC_ARM_HYST, 1000);
 
@@ -257,12 +287,13 @@ PARAM_DEFINE_INT32(COM_RC_ARM_HYST, 1000);
 PARAM_DEFINE_FLOAT(COM_DISARM_LAND, 2.0f);
 
 /**
- * Time-out for auto disarm if too slow to takeoff
+ * Time-out for auto disarm if not taking off
  *
- * A non-zero, positive value specifies the time after arming, in seconds, within which the
- * vehicle must take off (after which it will automatically disarm).
+ * A non-zero, positive value specifies the time in seconds, within which the
+ * vehicle is expected to take off after arming. In case the vehicle didn't takeoff
+ * within the timeout it disarms again.
  *
- * A zero or negative value means that automatic disarming triggered by a pre-takeoff timeout is disabled.
+ * A negative value disables autmoatic disarming triggered by a pre-takeoff timeout.
  *
  * @group Commander
  * @unit s
@@ -270,22 +301,23 @@ PARAM_DEFINE_FLOAT(COM_DISARM_LAND, 2.0f);
  */
 PARAM_DEFINE_FLOAT(COM_DISARM_PRFLT, 10.0f);
 
-
 /**
  * Allow arming without GPS
  *
- * The default allows to arm the vehicle without GPS signal.
+ * The default allows the vehicle to arm without GPS signal.
  *
  * @group Commander
- * @boolean
+ * @value 0 Require GPS lock to arm
+ * @value 1 Allow arming without GPS
  */
 PARAM_DEFINE_INT32(COM_ARM_WO_GPS, 1);
 
 /**
- * Arm switch is only a button
+ * Arm switch is a momentary button
  *
- * The default uses the arm switch as real switch.
- * If parameter set button gets handled like stick arming.
+ * 0: Arming/disarming triggers on switch transition.
+ * 1: Arming/disarming triggers when holding the momentary button down
+ * for COM_RC_ARM_HYST like the stick gesture.
  *
  * @group Commander
  * @boolean
@@ -309,6 +341,7 @@ PARAM_DEFINE_INT32(COM_LOW_BAT_ACT, 0);
 
 /**
  * Time-out to wait when offboard connection is lost before triggering offboard lost action.
+ *
  * See COM_OBL_ACT and COM_OBL_RC_ACT to configure action.
  *
  * @group Commander
@@ -317,7 +350,7 @@ PARAM_DEFINE_INT32(COM_LOW_BAT_ACT, 0);
  * @max 60
  * @increment 0.01
  */
-PARAM_DEFINE_FLOAT(COM_OF_LOSS_T, 0.5f);
+PARAM_DEFINE_FLOAT(COM_OF_LOSS_T, 1.0f);
 
 /**
  * Set offboard loss failsafe mode
@@ -356,6 +389,17 @@ PARAM_DEFINE_INT32(COM_OBL_ACT, 0);
 PARAM_DEFINE_INT32(COM_OBL_RC_ACT, 0);
 
 /**
+ * Time-out to wait when onboard computer connection is lost before warning about loss connection.
+ *
+ * @group Commander
+ * @unit s
+ * @min 0
+ * @max 60
+ * @increment 0.01
+ */
+PARAM_DEFINE_FLOAT(COM_OBC_LOSS_T, 5.0f);
+
+/**
  * First flightmode slot (1000-1160)
  *
  * If the main switch channel is in this range the
@@ -373,7 +417,6 @@ PARAM_DEFINE_INT32(COM_OBL_RC_ACT, 0);
  * @value 6 Acro
  * @value 7 Offboard
  * @value 8 Stabilized
- * @value 9 Rattitude
  * @value 12 Follow Me
  * @group Commander
  */
@@ -397,7 +440,6 @@ PARAM_DEFINE_INT32(COM_FLTMODE1, -1);
  * @value 6 Acro
  * @value 7 Offboard
  * @value 8 Stabilized
- * @value 9 Rattitude
  * @value 12 Follow Me
  * @group Commander
  */
@@ -421,7 +463,6 @@ PARAM_DEFINE_INT32(COM_FLTMODE2, -1);
  * @value 6 Acro
  * @value 7 Offboard
  * @value 8 Stabilized
- * @value 9 Rattitude
  * @value 12 Follow Me
  * @group Commander
  */
@@ -445,7 +486,6 @@ PARAM_DEFINE_INT32(COM_FLTMODE3, -1);
  * @value 6 Acro
  * @value 7 Offboard
  * @value 8 Stabilized
- * @value 9 Rattitude
  * @value 12 Follow Me
  * @group Commander
  */
@@ -469,7 +509,6 @@ PARAM_DEFINE_INT32(COM_FLTMODE4, -1);
  * @value 6 Acro
  * @value 7 Offboard
  * @value 8 Stabilized
- * @value 9 Rattitude
  * @value 12 Follow Me
  * @group Commander
  */
@@ -493,7 +532,6 @@ PARAM_DEFINE_INT32(COM_FLTMODE5, -1);
  * @value 6 Acro
  * @value 7 Offboard
  * @value 8 Stabilized
- * @value 9 Rattitude
  * @value 12 Follow Me
  * @group Commander
  */
@@ -544,31 +582,6 @@ PARAM_DEFINE_FLOAT(COM_ARM_EKF_HGT, 1.0f);
 PARAM_DEFINE_FLOAT(COM_ARM_EKF_YAW, 0.5f);
 
 /**
- * Maximum value of EKF accelerometer delta velocity bias estimate that will allow arming.
- * Note: ekf2 will limit the delta velocity bias estimate magnitude to be less than EKF2_ABL_LIM * FILTER_UPDATE_PERIOD_MS * 0.001 so this parameter must be less than that to be useful.
- *
- * @group Commander
- * @unit m/s
- * @min 0.001
- * @max 0.01
- * @decimal 4
- * @increment 0.0001
- */
-PARAM_DEFINE_FLOAT(COM_ARM_EKF_AB, 0.0022f);
-
-/**
- * Maximum value of EKF gyro delta angle bias estimate that will allow arming
- *
- * @group Commander
- * @unit rad
- * @min 0.0001
- * @max 0.0017
- * @decimal 4
- * @increment 0.0001
- */
-PARAM_DEFINE_FLOAT(COM_ARM_EKF_GB, 0.0011f);
-
-/**
  * Maximum accelerometer inconsistency between IMU units that will allow arming
  *
  * @group Commander
@@ -594,6 +607,7 @@ PARAM_DEFINE_FLOAT(COM_ARM_IMU_GYR, 0.25f);
 
 /**
  * Maximum magnetic field inconsistency between units that will allow arming
+ *
  * Set -1 to disable the check.
  *
  * @group Commander
@@ -627,17 +641,15 @@ PARAM_DEFINE_INT32(COM_REARM_GRACE, 1);
 /**
  * Enable RC stick override of auto and/or offboard modes
  *
- * When RC stick override is enabled, moving the RC sticks according to COM_RC_STICK_OV
- * immediately gives control back to the pilot (switches to manual position mode):
- * bit 0: Enable for auto modes (except for in critical battery reaction),
- * bit 1: Enable for offboard mode.
- *
- * Only has an effect on multicopters, and VTOLS in multicopter mode.
+ * When RC stick override is enabled, moving the RC sticks more than COM_RC_STICK_OV from
+ * their center position immediately gives control back to the pilot by switching to Position mode.
+ * Note: Only has an effect on multicopters, and VTOLs in multicopter mode.
  *
  * @min 0
- * @max 3
- * @bit 0 Enable override in auto modes
- * @bit 1 Enable override in offboard mode
+ * @max 7
+ * @bit 0 Enable override during auto modes (except for in critical battery reaction)
+ * @bit 1 Enable override during offboard mode
+ * @bit 2 Ignore throttle stick
  * @group Commander
  */
 PARAM_DEFINE_INT32(COM_RC_OVERRIDE, 1);
@@ -645,8 +657,8 @@ PARAM_DEFINE_INT32(COM_RC_OVERRIDE, 1);
 /**
  * RC stick override threshold
  *
- * If COM_RC_OVERRIDE is enabled and the joystick input controlling the horizontally axis (right stick for RC in mode 2)
- * is moved more than this threshold from the center the autopilot switches to position mode and the pilot takes over control.
+ * If COM_RC_OVERRIDE is enabled and the joystick input is moved more than this threshold
+ * the autopilot the pilot takes over control.
  *
  * @group Commander
  * @unit %
@@ -683,7 +695,7 @@ PARAM_DEFINE_INT32(COM_POSCTL_NAVL, 0);
 /**
  * Require arm authorization to arm
  *
- * The default allows to arm the vehicle without a arm authorization.
+ * By default off. The default allows to arm the vehicle without a arm authorization.
  *
  * @group Commander
  * @boolean
@@ -821,7 +833,7 @@ PARAM_DEFINE_INT32(COM_FLIGHT_UUID, 0);
  *
  * @value 0 Hold
  * @value 1 Mission (if valid)
- * @group Mission
+ * @group Commander
  */
 PARAM_DEFINE_INT32(COM_TAKEOFF_ACT, 0);
 
@@ -838,8 +850,10 @@ PARAM_DEFINE_INT32(COM_TAKEOFF_ACT, 0);
  * @value 3 Land mode
  * @value 5 Terminate
  * @value 6 Lockdown
+ * @min 0
+ * @max 6
  *
- * @group Mission
+ * @group Commander
  */
 PARAM_DEFINE_INT32(NAV_DLL_ACT, 0);
 
@@ -850,22 +864,37 @@ PARAM_DEFINE_INT32(NAV_DLL_ACT, 0);
  * set by COM_RC_LOSS_T in seconds. If RC input checks have been disabled
  * by setting the COM_RC_IN_MODE param it will not be triggered.
  *
- * @value 0 Disabled
  * @value 1 Hold mode
  * @value 2 Return mode
  * @value 3 Land mode
  * @value 5 Terminate
  * @value 6 Lockdown
+ * @min 1
+ * @max 6
  *
- * @group Mission
+ * @group Commander
  */
 PARAM_DEFINE_INT32(NAV_RCL_ACT, 2);
+
+/**
+ * RC loss exceptions
+ *
+ * Specify modes in which RC loss is ignored and the failsafe action not triggered.
+ *
+ * @min 0
+ * @max 31
+ * @bit 0 Mission
+ * @bit 1 Hold
+ * @bit 2 Offboard
+ * @group Commander
+ */
+PARAM_DEFINE_INT32(COM_RCL_EXCEPT, 0);
 
 /**
  * Flag to enable obstacle avoidance.
  *
  * @boolean
- * @group Mission
+ * @group Commander
  */
 PARAM_DEFINE_INT32(COM_OBS_AVOID, 0);
 
@@ -886,14 +915,15 @@ PARAM_DEFINE_INT32(COM_OBS_AVOID, 0);
 PARAM_DEFINE_INT32(COM_FLT_PROFILE, 0);
 
 /**
- * Require all the ESCs to be detected to arm.
+ * Enable checks on ESCs that report telemetry.
  *
- * This param is specific for ESCs reporting status. Normal ESCs configurations are not affected by the change of this param.
+ * If this parameter is set, the system will check ESC's online status and failures.
+ * This param is specific for ESCs reporting status. It shall be used only if ESCs support telemetry.
  *
  * @group Commander
  * @boolean
  */
-PARAM_DEFINE_INT32(COM_ARM_CHK_ESCS, 1);
+PARAM_DEFINE_INT32(COM_ARM_CHK_ESCS, 0);
 
 /**
  * Condition to enter prearmed mode
@@ -907,7 +937,7 @@ PARAM_DEFINE_INT32(COM_ARM_CHK_ESCS, 1);
  *
  * @group Commander
  */
-PARAM_DEFINE_INT32(COM_PREARM_MODE, 1);
+PARAM_DEFINE_INT32(COM_PREARM_MODE, 0);
 
 /**
  * Enable Motor Testing
@@ -961,7 +991,7 @@ PARAM_DEFINE_INT32(COM_POWER_COUNT, 1);
  *
  * A non-zero, positive value specifies the timeframe in seconds within failure detector is allowed to put the vehicle into
  * a lockdown state if attitude exceeds the limits defined in FD_FAIL_P and FD_FAIL_R.
- * The check is not executed for flight modes that do support acrobatic maneuvers, e.g: Acro (MC/FW), Rattitude and Manual (FW).
+ * The check is not executed for flight modes that do support acrobatic maneuvers, e.g: Acro (MC/FW) and Manual (FW).
  * A zero or negative value means that the check is disabled.
  *
  * @group Commander
@@ -971,3 +1001,29 @@ PARAM_DEFINE_INT32(COM_POWER_COUNT, 1);
  * @decimal 3
  */
 PARAM_DEFINE_FLOAT(COM_LKDOWN_TKO, 3.0f);
+
+/**
+* Enable preflight check for maximal allowed airspeed when arming.
+*
+* Deny arming if the current airspeed measurement is greater than half the cruise airspeed (FW_AIRSPD_TRIM).
+* Excessive airspeed measurements on ground are either caused by wind or bad airspeed calibration.
+*
+* @group Commander
+* @value 0 Disabled
+* @value 1 Enabled
+*/
+PARAM_DEFINE_INT32(COM_ARM_ARSP_EN, 1);
+
+/**
+ * Enable FMU SD card detection check
+ *
+ * This check detects if the FMU SD card is missing.
+ * Depending on the value of the parameter, the check can be
+ * disabled, warn only or deny arming.
+ *
+ * @group Commander
+ * @value 0 Disabled
+ * @value 1 Warning only
+ * @value 2 Enforce SD card presence
+ */
+PARAM_DEFINE_INT32(COM_ARM_SDCARD, 1);

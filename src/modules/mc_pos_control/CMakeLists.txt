@@ -31,24 +31,20 @@
 #
 ############################################################################
 
-add_subdirectory(Takeoff)
 add_subdirectory(PositionControl)
+add_subdirectory(Takeoff)
 
 px4_add_module(
 	MODULE modules__mc_pos_control
 	MAIN mc_pos_control
 	COMPILE_FLAGS
-		-Wno-implicit-fallthrough # TODO: fix and remove
 	SRCS
 		MulticopterPositionControl.cpp
 		MulticopterPositionControl.hpp
 	DEPENDS
 		PositionControl
-		controllib
-		FlightTasks
-		git_ecl
-		ecl_geo
-		WeatherVane
-		CollisionPrevention
 		Takeoff
+		controllib
+		ecl_geo
+		SlewRate
 	)

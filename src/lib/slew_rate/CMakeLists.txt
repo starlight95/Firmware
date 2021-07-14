@@ -33,6 +33,8 @@
 
 px4_add_library(SlewRate
 	dummy.cpp
+	SlewRate.hpp
+	SlewRateYaw.hpp
 )
 target_include_directories(SlewRate
 	PUBLIC
@@ -42,3 +44,4 @@ target_include_directories(SlewRate
 target_link_libraries(SlewRate PUBLIC mathlib)
 
 px4_add_unit_gtest(SRC SlewRateTest.cpp LINKLIBS SlewRate)
+px4_add_unit_gtest(SRC SlewRateYawTest.cpp LINKLIBS SlewRate)

@@ -40,12 +40,11 @@ using namespace time_literals;
 namespace Bosch::BMI055::Gyroscope
 {
 
-BMI055_Gyroscope::BMI055_Gyroscope(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation,
-				   int bus_frequency, spi_mode_e spi_mode, spi_drdy_gpio_t drdy_gpio) :
-	BMI055(DRV_GYR_DEVTYPE_BMI055, "BMI055_Gyroscope", bus_option, bus, device, spi_mode, bus_frequency, drdy_gpio),
-	_px4_gyro(get_device_id(), rotation)
+BMI055_Gyroscope::BMI055_Gyroscope(const I2CSPIDriverConfig &config) :
+	BMI055(config),
+	_px4_gyro(get_device_id(), config.rotation)
 {
-	if (drdy_gpio != 0) {
+	if (config.drdy_gpio != 0) {
 		_drdy_missed_perf = perf_alloc(PC_COUNT, MODULE_NAME"_gyro: DRDY missed");
 	}
 
@@ -265,10 +264,6 @@ void BMI055_Gyroscope::ConfigureGyro()
 
 void BMI055_Gyroscope::ConfigureSampleRate(int sample_rate)
 {
-	if (sample_rate == 0) {
-		sample_rate = 1000; // default to 1000 Hz
-	}
-
 	// round down to nearest FIFO sample dt * SAMPLES_PER_TRANSFER
 	const float min_interval = FIFO_SAMPLE_DT;
 	_fifo_empty_interval_us = math::max(roundf((1e6f / (float)sample_rate) / min_interval) * min_interval, min_interval);

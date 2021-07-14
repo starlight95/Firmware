@@ -113,7 +113,7 @@ include(px4_parse_function_args)
 include(px4_git)
 
 execute_process(
-	COMMAND git describe --always --tags
+	COMMAND git describe --exclude ext/* --always --tags
 	OUTPUT_VARIABLE PX4_GIT_TAG
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 	WORKING_DIRECTORY ${PX4_SOURCE_DIR}
@@ -128,6 +128,10 @@ define_property(GLOBAL PROPERTY PX4_MODULE_LIBRARIES
 define_property(GLOBAL PROPERTY PX4_MODULE_PATHS
                  BRIEF_DOCS "PX4 module paths"
                  FULL_DOCS "List of paths to all PX4 modules"
+                 )
+define_property(GLOBAL PROPERTY PX4_SRC_FILES
+                 BRIEF_DOCS "src files from all PX4 modules & libs"
+                 FULL_DOCS "SRC files from px4_add_{module,library}"
                  )
 
 #=============================================================================
@@ -185,6 +189,8 @@ if((CMAKE_BUILD_TYPE STREQUAL "Debug") OR (CMAKE_BUILD_TYPE STREQUAL "Coverage")
 	set(MAX_CUSTOM_OPT_LEVEL -O0)
 elseif(CMAKE_BUILD_TYPE MATCHES "Sanitizer")
 	set(MAX_CUSTOM_OPT_LEVEL -O1)
+elseif(CMAKE_BUILD_TYPE MATCHES "Release")
+	set(MAX_CUSTOM_OPT_LEVEL -O3)
 else()
 	if(px4_constrained_flash_build)
 		set(MAX_CUSTOM_OPT_LEVEL -Os)
@@ -406,7 +412,6 @@ add_subdirectory(src/lib EXCLUDE_FROM_ALL)
 
 add_subdirectory(platforms/${PX4_PLATFORM}/src/px4)
 add_subdirectory(platforms EXCLUDE_FROM_ALL)
-add_subdirectory(src/modules/uORB EXCLUDE_FROM_ALL) # TODO: platform layer
 
 if(EXISTS "${PX4_BOARD_DIR}/CMakeLists.txt")
 	add_subdirectory(${PX4_BOARD_DIR})
@@ -415,6 +420,9 @@ endif()
 foreach(module ${config_module_list})
 	add_subdirectory(src/${module})
 endforeach()
+
+# add events lib after modules and libs as it needs to know all source files (PX4_SRC_FILES)
+add_subdirectory(src/lib/events EXCLUDE_FROM_ALL)
 
 # must be the last module before firmware
 add_subdirectory(src/lib/parameters EXCLUDE_FROM_ALL)
@@ -455,3 +463,10 @@ add_custom_target(size
 	WORKING_DIRECTORY ${PX4_BINARY_DIR}
 	USES_TERMINAL
 	)
+
+# install python requirements using configured python
+add_custom_target(install_python_requirements
+	COMMAND ${PYTHON_EXECUTABLE} -m pip install --requirement ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
+	DEPENDS ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
+	USES_TERMINAL
+)

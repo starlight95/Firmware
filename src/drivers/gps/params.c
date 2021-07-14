@@ -115,12 +115,13 @@ PARAM_DEFINE_FLOAT(GPS_YAW_OFFSET, 0.f);
  * Auto-detection will probe all protocols, and thus is a bit slower.
  *
  * @min 0
- * @max 4
+ * @max 5
  * @value 0 Auto detect
  * @value 1 u-blox
  * @value 2 MTK
  * @value 3 Ashtech / Trimble
  * @value 4 Emlid Reach
+ * @value 5 Femtomes
  *
  * @reboot_required true
  * @group GPS
@@ -135,14 +136,75 @@ PARAM_DEFINE_INT32(GPS_1_PROTOCOL, 1);
  * Auto-detection will probe all protocols, and thus is a bit slower.
  *
  * @min 0
- * @max 4
+ * @max 5
  * @value 0 Auto detect
  * @value 1 u-blox
  * @value 2 MTK
  * @value 3 Ashtech / Trimble
  * @value 4 Emlid Reach
+ * @value 5 Femtomes
  *
  * @reboot_required true
  * @group GPS
  */
 PARAM_DEFINE_INT32(GPS_2_PROTOCOL, 1);
+
+/**
+ * GNSS Systems for Primary GPS (integer bitmask)
+ *
+ * This integer bitmask controls the set of GNSS systems used by the receiver. Check your
+ * receiver's documentation on how many systems are supported to be used in parallel.
+ *
+ * Currently this functionality is just implemented for u-blox receivers.
+ *
+ * When no bits are set, the receiver's default configuration should be used.
+ *
+ * Set bits true to enable:
+ * 0 : Use GPS (with QZSS)
+ * 1 : Use SBAS (multiple GPS augmentation systems)
+ * 2 : Use Galileo
+ * 3 : Use BeiDou
+ * 4 : Use GLONASS
+ *
+ * @min 0
+ * @max 31
+ * @bit 0 GPS (with QZSS)
+ * @bit 1 SBAS
+ * @bit 2 Galileo
+ * @bit 3 BeiDou
+ * @bit 4 GLONASS
+ *
+ * @reboot_required true
+ * @group GPS
+ */
+PARAM_DEFINE_INT32(GPS_1_GNSS, 0);
+
+/**
+ * GNSS Systems for Secondary GPS (integer bitmask)
+ *
+ * This integer bitmask controls the set of GNSS systems used by the receiver. Check your
+ * receiver's documentation on how many systems are supported to be used in parallel.
+ *
+ * Currently this functionality is just implemented for u-blox receivers.
+ *
+ * When no bits are set, the receiver's default configuration should be used.
+ *
+ * Set bits true to enable:
+ * 0 : Use GPS (with QZSS)
+ * 1 : Use SBAS (multiple GPS augmentation systems)
+ * 2 : Use Galileo
+ * 3 : Use BeiDou
+ * 4 : Use GLONASS
+ *
+ * @min 0
+ * @max 31
+ * @bit 0 GPS (with QZSS)
+ * @bit 1 SBAS
+ * @bit 2 Galileo
+ * @bit 3 BeiDou
+ * @bit 4 GLONASS
+ *
+ * @reboot_required true
+ * @group GPS
+ */
+PARAM_DEFINE_INT32(GPS_2_GNSS, 0);

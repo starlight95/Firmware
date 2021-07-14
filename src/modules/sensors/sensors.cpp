@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,6 +48,7 @@
 #include <lib/mathlib/mathlib.h>
 #include <lib/parameters/param.h>
 #include <lib/perf/perf_counter.h>
+#include <lib/sensor_calibration/Utilities.hpp>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
@@ -64,6 +65,7 @@
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/differential_pressure.h>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensors_status_imu.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_control_mode.h>
@@ -124,8 +126,9 @@ private:
 		{this, ORB_ID(vehicle_imu), 3}
 	};
 
+	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
+
 	uORB::Subscription _diff_pres_sub{ORB_ID(differential_pressure)};
-	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _vcontrol_mode_sub{ORB_ID(vehicle_control_mode)};
 	uORB::Subscription _vehicle_air_data_sub{ORB_ID(vehicle_air_data)};
 
@@ -178,7 +181,11 @@ private:
 
 	VehicleIMU      *_vehicle_imu_list[MAX_SENSOR_COUNT] {};
 
-	int _lockstep_component{-1};
+	uint8_t _n_accel{0};
+	uint8_t _n_baro{0};
+	uint8_t _n_gps{0};
+	uint8_t _n_gyro{0};
+	uint8_t _n_mag{0};
 
 	/**
 	 * Update our local parameter cache.
@@ -235,23 +242,7 @@ Sensors::Sensors(bool hil_enabled) :
 	_parameter_handles.air_tube_length = param_find("CAL_AIR_TUBELEN");
 	_parameter_handles.air_tube_diameter_mm = param_find("CAL_AIR_TUBED_MM");
 
-	param_find("BAT_V_DIV");
-	param_find("BAT_A_PER_V");
-
-	param_find("CAL_ACC0_ID");
-	param_find("CAL_GYRO0_ID");
-
-	param_find("SENS_BOARD_ROT");
-	param_find("SENS_BOARD_X_OFF");
-	param_find("SENS_BOARD_Y_OFF");
-	param_find("SENS_BOARD_Z_OFF");
-
 	param_find("SYS_FAC_CAL_MODE");
-	param_find("SYS_PARAM_VER");
-	param_find("SYS_AUTOSTART");
-	param_find("SYS_AUTOCONFIG");
-	param_find("TRIG_MODE");
-	param_find("UAVCAN_ENABLE");
 
 	// Parameters controlling the on-board sensor thermal calibrator
 	param_find("SYS_CAL_TDEL");
@@ -298,8 +289,6 @@ Sensors::~Sensors()
 	}
 
 	perf_free(_loop_perf);
-
-	px4_lockstep_unregister_component(_lockstep_component);
 }
 
 bool Sensors::init()
@@ -326,6 +315,54 @@ int Sensors::parameters_update()
 	param_get(_parameter_handles.air_tube_diameter_mm, &_parameters.air_tube_diameter_mm);
 
 	_voted_sensors_update.parametersUpdate();
+
+	// mark all existing sensor calibrations active even if sensor is missing
+	// this preserves the calibration in the event of a parameter export while the sensor is missing
+	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+		uint32_t device_id_accel = calibration::GetCalibrationParam("ACC",  "ID", i);
+		uint32_t device_id_gyro  = calibration::GetCalibrationParam("GYRO", "ID", i);
+		uint32_t device_id_mag   = calibration::GetCalibrationParam("MAG",  "ID", i);
+
+		if (device_id_accel != 0) {
+			bool external_accel = (calibration::GetCalibrationParam("ACC", "ROT", i) >= 0);
+			calibration::Accelerometer accel_cal(device_id_accel, external_accel);
+		}
+
+		if (device_id_gyro != 0) {
+			bool external_gyro = (calibration::GetCalibrationParam("GYRO", "ROT", i) >= 0);
+			calibration::Gyroscope gyro_cal(device_id_gyro, external_gyro);
+		}
+
+		if (device_id_mag != 0) {
+			bool external_mag = (calibration::GetCalibrationParam("MAG", "ROT", i) >= 0);
+			calibration::Magnetometer mag_cal(device_id_mag, external_mag);
+		}
+	}
+
+	// ensure calibration slots are active for the number of sensors currently available
+	// this to done to eliminate differences in the active set of parameters before and after sensor calibration
+	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+		if (orb_exists(ORB_ID(sensor_accel), i) == PX4_OK) {
+			bool external = (calibration::GetCalibrationParam("ACC", "ROT", i) >= 0);
+			calibration::Accelerometer cal{0, external};
+			cal.set_calibration_index(i);
+			cal.ParametersUpdate();
+		}
+
+		if (orb_exists(ORB_ID(sensor_gyro), i) == PX4_OK) {
+			bool external = (calibration::GetCalibrationParam("GYRO", "ROT", i) >= 0);
+			calibration::Gyroscope cal{0, external};
+			cal.set_calibration_index(i);
+			cal.ParametersUpdate();
+		}
+
+		if (orb_exists(ORB_ID(sensor_mag), i) == PX4_OK) {
+			bool external = (calibration::GetCalibrationParam("MAG", "ROT", i) >= 0);
+			calibration::Magnetometer cal{0, external};
+			cal.set_calibration_index(i);
+			cal.ParametersUpdate();
+		}
+	}
 
 	return PX4_OK;
 }
@@ -629,24 +666,38 @@ void Sensors::Run()
 
 	// keep adding sensors as long as we are not armed,
 	// when not adding sensors poll for param updates
-	if (!_armed && hrt_elapsed_time(&_last_config_update) > 500_ms) {
+	if (!_armed && hrt_elapsed_time(&_last_config_update) > 1000_ms) {
+
+		const int n_accel = orb_group_count(ORB_ID(sensor_accel));
+		const int n_baro  = orb_group_count(ORB_ID(sensor_baro));
+		const int n_gps   = orb_group_count(ORB_ID(sensor_gps));
+		const int n_gyro  = orb_group_count(ORB_ID(sensor_gyro));
+		const int n_mag   = orb_group_count(ORB_ID(sensor_mag));
+
+		if ((n_accel != _n_accel) || (n_baro != _n_baro) || (n_gps != _n_gps) || (n_gyro != _n_gyro) || (n_mag != _n_mag)) {
+			_n_accel = n_accel;
+			_n_baro = n_baro;
+			_n_gps = n_gps;
+			_n_gyro = n_gyro;
+			_n_mag = n_mag;
+
+			parameters_update();
+
+			InitializeVehicleAirData();
+			InitializeVehicleGPSPosition();
+			InitializeVehicleMagnetometer();
+		}
+
+		// sensor device id (not just orb_group_count) must be populated before IMU init can succeed
 		_voted_sensors_update.initializeSensors();
-		InitializeVehicleAirData();
 		InitializeVehicleIMU();
-		InitializeVehicleGPSPosition();
-		InitializeVehicleMagnetometer();
+
 		_last_config_update = hrt_absolute_time();
 
 	} else {
 		// check parameters for updates
 		parameter_update_poll();
 	}
-
-	if (_lockstep_component == -1) {
-		_lockstep_component = px4_lockstep_register_component();
-	}
-
-	px4_lockstep_progress(_lockstep_component);
 
 	perf_end(_loop_perf);
 }

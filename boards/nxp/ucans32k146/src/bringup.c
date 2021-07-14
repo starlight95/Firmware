@@ -57,6 +57,10 @@
 #  include "s32k1xx_lpi2c.h"
 #endif
 
+#ifdef CONFIG_S32K1XX_EEEPROM
+#  include "s32k1xx_eeeprom.h"
+#endif
+
 #include "board_config.h"
 
 /****************************************************************************
@@ -114,6 +118,12 @@ int s32k1xx_bringup(void)
 
 #endif
 
+#ifdef CONFIG_S32K1XX_EEEPROM
+	/* Register EEEPROM block device */
+
+	s32k1xx_eeeprom_register(0, 4096);
+#endif
+
 #ifdef CONFIG_S32K1XX_LPSPI
 	/* Configure SPI chip selects if 1) SPI is not disabled, and 2) the weak
 	 * function s32k1xx_spidev_initialize() has been brought into the link.
@@ -128,18 +138,32 @@ int s32k1xx_bringup(void)
 	i2c = s32k1xx_i2cbus_initialize(0);
 
 	if (i2c == NULL) {
-		serr("ERROR: Failed to get I2C%d interface\n", bus);
+		serr("ERROR: Failed to get I2C0 interface\n");
 
 	} else {
 		ret = i2c_register(i2c, 0);
 
 		if (ret < 0) {
-			serr("ERROR: Failed to register I2C%d driver: %d\n", bus, ret);
+			serr("ERROR: Failed to register I2C0 driver: %d\n", ret);
 			s32k1xx_i2cbus_uninitialize(i2c);
 		}
 	}
 
 #endif
+#endif
+
+#ifdef CONFIG_S32K1XX_FLEXCAN
+	s32k1xx_pinconfig(BOARD_REVISION_DETECT_PIN);
+
+	if (s32k1xx_gpioread(BOARD_REVISION_DETECT_PIN)) {
+		/* STB high -> active CAN phy */
+		s32k1xx_pinconfig(PIN_CAN0_STB  | GPIO_OUTPUT_ONE);
+
+	} else {
+		/* STB low -> active CAN phy */
+		s32k1xx_pinconfig(PIN_CAN0_STB  | GPIO_OUTPUT_ZERO);
+	}
+
 #endif
 
 	return ret;

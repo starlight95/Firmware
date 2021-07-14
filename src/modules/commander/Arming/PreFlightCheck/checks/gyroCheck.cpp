@@ -58,23 +58,28 @@ bool PreFlightCheck::gyroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 
 		if (!valid) {
 			if (report_fail) {
-				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: no valid data from Gyro #%u", instance);
+				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: no valid data from Gyro %u", instance);
 			}
 		}
 
 		device_id = gyro.get().device_id;
 
-		calibration_valid = (calibration::FindCalibrationIndex("GYRO", device_id) >= 0);
+		if (status.hil_state == vehicle_status_s::HIL_STATE_ON) {
+			calibration_valid = true;
+
+		} else {
+			calibration_valid = (calibration::FindCalibrationIndex("GYRO", device_id) >= 0);
+		}
 
 		if (!calibration_valid) {
 			if (report_fail) {
-				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Gyro #%u uncalibrated", instance);
+				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Gyro %u uncalibrated", instance);
 			}
 		}
 
 	} else {
 		if (!optional && report_fail) {
-			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Gyro Sensor #%u missing", instance);
+			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Gyro Sensor %u missing", instance);
 		}
 	}
 

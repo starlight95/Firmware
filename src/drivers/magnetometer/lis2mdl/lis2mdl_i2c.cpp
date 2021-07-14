@@ -49,12 +49,9 @@
 #include <unistd.h>
 
 #include <drivers/device/i2c.h>
-#include <drivers/drv_device.h>
 
 #include "board_config.h"
 #include "lis2mdl.h"
-
-#define LIS2MDLL_ADDRESS        0x1e
 
 class LIS2MDL_I2C : public device::I2C
 {

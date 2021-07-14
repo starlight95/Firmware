@@ -59,17 +59,22 @@ bool PreFlightCheck::accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_s
 
 		if (!valid) {
 			if (report_fail) {
-				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: no valid data from Accel #%u", instance);
+				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: no valid data from Accel %u", instance);
 			}
 		}
 
 		device_id = accel.get().device_id;
 
-		calibration_valid = (calibration::FindCalibrationIndex("ACC", device_id) >= 0);
+		if (status.hil_state == vehicle_status_s::HIL_STATE_ON) {
+			calibration_valid = true;
+
+		} else {
+			calibration_valid = (calibration::FindCalibrationIndex("ACC", device_id) >= 0);
+		}
 
 		if (!calibration_valid) {
 			if (report_fail) {
-				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel #%u uncalibrated", instance);
+				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel %u uncalibrated", instance);
 			}
 
 		} else {
@@ -89,7 +94,7 @@ bool PreFlightCheck::accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_s
 
 	} else {
 		if (!optional && report_fail) {
-			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel Sensor #%u missing", instance);
+			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel Sensor %u missing", instance);
 		}
 	}
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020, 2001 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,7 +40,6 @@ namespace sensors
 {
 
 using namespace matrix;
-using namespace time_literals;
 
 static constexpr uint32_t SENSOR_TIMEOUT{300_ms};
 
@@ -48,18 +47,6 @@ VehicleMagnetometer::VehicleMagnetometer() :
 	ModuleParams(nullptr),
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers)
 {
-	char str[20] {};
-
-	for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
-		// CAL_MAGx_ID
-		sprintf(str, "CAL_%s%u_ID", "MAG", mag_index);
-		param_find(str);
-
-		// CAL_MAGx_ROT
-		sprintf(str, "CAL_%s%u_ROT", "MAG", mag_index);
-		param_find(str);
-	}
-
 	param_find("CAL_MAG_SIDES");
 	param_find("CAL_MAG_ROT_AUTO");
 
@@ -94,10 +81,10 @@ void VehicleMagnetometer::Stop()
 void VehicleMagnetometer::ParametersUpdate(bool force)
 {
 	// Check if parameters have changed
-	if (_params_sub.updated() || force) {
+	if (_parameter_update_sub.updated() || force) {
 		// clear update
 		parameter_update_s param_update;
-		_params_sub.copy(&param_update);
+		_parameter_update_sub.copy(&param_update);
 
 		updateParams();
 
@@ -106,16 +93,26 @@ void VehicleMagnetometer::ParametersUpdate(bool force)
 
 		if (mag_comp_typ != _mag_comp_type) {
 			// check mag power compensation type (change battery current subscription instance if necessary)
-			if (mag_comp_typ == MagCompensationType::Current_inst0 && _mag_comp_type != MagCompensationType::Current_inst0) {
-				_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 0};
-			}
+			switch (mag_comp_typ) {
+			case MagCompensationType::Current_inst0:
+				_battery_status_sub.ChangeInstance(0);
+				break;
 
-			if (mag_comp_typ == MagCompensationType::Current_inst1 && _mag_comp_type != MagCompensationType::Current_inst1) {
-				_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 1};
-			}
+			case MagCompensationType::Current_inst1:
+				_battery_status_sub.ChangeInstance(1);
+				break;
 
-			if (mag_comp_typ == MagCompensationType::Throttle) {
-				_actuator_controls_0_sub = uORB::Subscription{ORB_ID(actuator_controls_0)};
+			case MagCompensationType::Throttle:
+				break;
+
+			default:
+
+				// ensure power compensation is disabled
+				for (auto &cal : _calibration) {
+					cal.UpdatePower(0.f);
+				}
+
+				break;
 			}
 		}
 
@@ -141,6 +138,114 @@ void VehicleMagnetometer::ParametersUpdate(bool force)
 	}
 }
 
+void VehicleMagnetometer::MagCalibrationUpdate()
+{
+	// State variance assumed for magnetometer bias storage.
+	// This is a reference variance used to calculate the fraction of learned magnetometer bias that will be used to update the stored value.
+	// Larger values cause a larger fraction of the learned biases to be used.
+	static constexpr float magb_vref = 2.5e-7f;
+	static constexpr float min_var_allowed = magb_vref * 0.01f;
+	static constexpr float max_var_allowed = magb_vref * 100.f;
+
+	if (_armed) {
+		static constexpr uint8_t mag_cal_size = sizeof(_mag_cal) / sizeof(_mag_cal[0]);
+
+		for (int i = 0; i < math::min(_estimator_sensor_bias_subs.size(), mag_cal_size); i++) {
+			estimator_sensor_bias_s estimator_sensor_bias;
+
+			if (_estimator_sensor_bias_subs[i].update(&estimator_sensor_bias)) {
+
+				const Vector3f bias{estimator_sensor_bias.mag_bias};
+				const Vector3f bias_variance{estimator_sensor_bias.mag_bias_variance};
+
+				const bool valid = (hrt_elapsed_time(&estimator_sensor_bias.timestamp) < 1_s)
+						   && (estimator_sensor_bias.mag_device_id != 0) && estimator_sensor_bias.mag_bias_valid
+						   && (bias_variance.min() > min_var_allowed) && (bias_variance.max() < max_var_allowed);
+
+				if (valid) {
+					// find corresponding mag calibration
+					for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
+						if (_calibration[mag_index].device_id() == estimator_sensor_bias.mag_device_id) {
+
+							const auto old_offset = _mag_cal[i].mag_offset;
+
+							_mag_cal[i].device_id = estimator_sensor_bias.mag_device_id;
+							_mag_cal[i].mag_offset = _calibration[mag_index].BiasCorrectedSensorOffset(bias);
+							_mag_cal[i].mag_bias_variance = bias_variance;
+
+							_mag_cal_available = true;
+
+							if ((old_offset - _mag_cal[i].mag_offset).longerThan(0.01f)) {
+								PX4_DEBUG("Mag %d (%d) est. offset saved: [% 05.3f % 05.3f % 05.3f] (bias [% 05.3f % 05.3f % 05.3f])",
+									  mag_index, _mag_cal[i].device_id,
+									  (double)_mag_cal[i].mag_offset(0), (double)_mag_cal[i].mag_offset(1), (double)_mag_cal[i].mag_offset(2),
+									  (double)bias(0), (double)bias(1), (double)bias(2));
+							}
+
+							break;
+						}
+					}
+				}
+			}
+		}
+
+	} else if (_mag_cal_available) {
+		// not armed and mag cal available
+		bool calibration_param_save_needed = false;
+		// iterate through available bias estimates and fuse them sequentially using a Kalman Filter scheme
+		Vector3f state_variance{magb_vref, magb_vref, magb_vref};
+
+		for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
+			// apply all valid saved offsets
+			for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
+				if ((_calibration[mag_index].device_id() != 0) && (_mag_cal[i].device_id == _calibration[mag_index].device_id())) {
+
+					const Vector3f mag_cal_orig{_calibration[mag_index].offset()};
+					Vector3f mag_cal_offset{_calibration[mag_index].offset()};
+
+					// calculate weighting using ratio of variances and update stored bias values
+					const Vector3f &observation = _mag_cal[i].mag_offset;
+					const Vector3f &obs_variance = _mag_cal[i].mag_bias_variance;
+
+					for (int axis_index = 0; axis_index < 3; axis_index++) {
+						const float innovation_variance = state_variance(axis_index) + obs_variance(axis_index);
+						const float innovation = mag_cal_offset(axis_index) - observation(axis_index);
+						const float kalman_gain = state_variance(axis_index) / innovation_variance;
+						mag_cal_offset(axis_index) -= innovation * kalman_gain;
+						state_variance(axis_index) = fmaxf(state_variance(axis_index) * (1.f - kalman_gain), 0.f);
+					}
+
+					if (_calibration[mag_index].set_offset(mag_cal_offset)) {
+
+						PX4_INFO("%d (%" PRIu32 ") EST:%d offset committed: [%.2f %.2f %.2f]->[%.2f %.2f %.2f] (full [%.2f %.2f %.2f])",
+							 mag_index, _calibration[mag_index].device_id(), i,
+							 (double)mag_cal_orig(0), (double)mag_cal_orig(1), (double)mag_cal_orig(2),
+							 (double)mag_cal_offset(0), (double)mag_cal_offset(1), (double)mag_cal_offset(2),
+							 (double)_mag_cal[i].mag_offset(0), (double)_mag_cal[i].mag_offset(1), (double)_mag_cal[i].mag_offset(2));
+
+						calibration_param_save_needed = true;
+					}
+
+					// clear
+					_mag_cal[i].device_id = 0;
+					_mag_cal[i].mag_offset.zero();
+					_mag_cal[i].mag_bias_variance.zero();
+				}
+			}
+		}
+
+		if (calibration_param_save_needed) {
+			for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
+				if (_calibration[mag_index].device_id() != 0) {
+					_calibration[mag_index].ParametersSave();
+				}
+			}
+
+			_mag_cal_available = false;
+		}
+	}
+}
+
 void VehicleMagnetometer::Run()
 {
 	perf_begin(_cycle_perf);
@@ -148,37 +253,35 @@ void VehicleMagnetometer::Run()
 	ParametersUpdate();
 
 	// check vehicle status for changes to armed state
-	if (_vcontrol_mode_sub.updated()) {
-		vehicle_control_mode_s vcontrol_mode;
+	if (_vehicle_control_mode_sub.updated()) {
+		vehicle_control_mode_s vehicle_control_mode;
 
-		if (_vcontrol_mode_sub.copy(&vcontrol_mode)) {
-			_armed = vcontrol_mode.flag_armed;
+		if (_vehicle_control_mode_sub.copy(&vehicle_control_mode)) {
+			_armed = vehicle_control_mode.flag_armed;
 		}
 	}
 
 	if (_mag_comp_type != MagCompensationType::Disabled) {
 		// update power signal for mag compensation
-		if (_armed) {
-			if (_mag_comp_type == MagCompensationType::Throttle) {
-				actuator_controls_s controls;
+		if (_armed && (_mag_comp_type == MagCompensationType::Throttle)) {
+			actuator_controls_s controls;
 
-				if (_actuator_controls_0_sub.update(&controls)) {
-					for (auto &cal : _calibration) {
-						cal.UpdatePower(controls.control[actuator_controls_s::INDEX_THROTTLE]);
-					}
+			if (_actuator_controls_0_sub.update(&controls)) {
+				for (auto &cal : _calibration) {
+					cal.UpdatePower(controls.control[actuator_controls_s::INDEX_THROTTLE]);
 				}
+			}
 
-			} else if (_mag_comp_type == MagCompensationType::Current_inst0
-				   || _mag_comp_type == MagCompensationType::Current_inst1) {
+		} else if ((_mag_comp_type == MagCompensationType::Current_inst0)
+			   || (_mag_comp_type == MagCompensationType::Current_inst1)) {
 
-				battery_status_s bat_stat;
+			battery_status_s bat_stat;
 
-				if (_battery_status_sub.update(&bat_stat)) {
-					float power = bat_stat.current_a * 0.001f; //current in [kA]
+			if (_battery_status_sub.update(&bat_stat)) {
+				float power = bat_stat.current_a * 0.001f; // current in [kA]
 
-					for (auto &cal : _calibration) {
-						cal.UpdatePower(power);
-					}
+				for (auto &cal : _calibration) {
+					cal.UpdatePower(power);
 				}
 			}
 
@@ -213,7 +316,7 @@ void VehicleMagnetometer::Run()
 					// advertise outputs in order if publishing all
 					if (!_param_sens_mag_mode.get()) {
 						for (int instance = 0; instance < uorb_index; instance++) {
-							_vehicle_magnetometer_multi_pub[instance].advertise();
+							_vehicle_magnetometer_pub[instance].advertise();
 						}
 					}
 
@@ -272,7 +375,7 @@ void VehicleMagnetometer::Run()
 
 			if (_param_sens_mag_mode.get()) {
 				if (_selected_sensor_sub_index >= 0) {
-					PX4_INFO("%s switch from #%u -> #%d", "MAG", _selected_sensor_sub_index, best_index);
+					PX4_INFO("%s switch from #%" PRId8 " -> #%d", "MAG", _selected_sensor_sub_index, best_index);
 				}
 			}
 
@@ -337,6 +440,8 @@ void VehicleMagnetometer::Run()
 		calcMagInconsistency();
 	}
 
+	MagCalibrationUpdate();
+
 	// reschedule timeout
 	ScheduleDelayed(20_ms);
 
@@ -345,7 +450,7 @@ void VehicleMagnetometer::Run()
 
 void VehicleMagnetometer::Publish(uint8_t instance, bool multi)
 {
-	if ((_param_sens_mag_rate.get() > 0) && (_last_publication_timestamp[instance] ||
+	if ((_param_sens_mag_rate.get() > 0) && ((_last_publication_timestamp[instance] == 0) ||
 			(hrt_elapsed_time(&_last_publication_timestamp[instance]) >= (1e6f / _param_sens_mag_rate.get())))) {
 
 		const Vector3f magnetometer_data = _mag_sum[instance] / _mag_sum_count[instance];
@@ -366,11 +471,11 @@ void VehicleMagnetometer::Publish(uint8_t instance, bool multi)
 		out.timestamp = hrt_absolute_time();
 
 		if (multi) {
-			_vehicle_magnetometer_multi_pub[instance].publish(out);
+			_vehicle_magnetometer_pub[instance].publish(out);
 
 		} else {
 			// otherwise only ever publish the first instance
-			_vehicle_magnetometer_pub.publish(out);
+			_vehicle_magnetometer_pub[0].publish(out);
 		}
 
 		_last_publication_timestamp[instance] = out.timestamp;
@@ -425,7 +530,7 @@ void VehicleMagnetometer::calcMagInconsistency()
 void VehicleMagnetometer::PrintStatus()
 {
 	if (_selected_sensor_sub_index >= 0) {
-		PX4_INFO("selected magnetometer: %d (%d)", _last_data[_selected_sensor_sub_index].device_id,
+		PX4_INFO("selected magnetometer: %" PRIu32 " (%" PRId8 ")", _last_data[_selected_sensor_sub_index].device_id,
 			 _selected_sensor_sub_index);
 	}
 

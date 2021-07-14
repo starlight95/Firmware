@@ -43,6 +43,8 @@
 
 #include "board_config.h"
 
+#include <syslog.h>
+
 #include <nuttx/config.h>
 #include <nuttx/board.h>
 #include <nuttx/sdio.h>
@@ -228,6 +230,10 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 #endif /* CONFIG_MMCSD */
+
+	/* Configure the HW based on the manifest */
+
+	px4_platform_configure();
 
 	return OK;
 }

@@ -106,16 +106,11 @@ BlockLocalPositionEstimator::BlockLocalPositionEstimator() :
 
 	// local to global coversion related variables
 	_is_global_cov_init(false),
-	_global_ref_timestamp(0.0),
 	_ref_lat(0.0),
 	_ref_lon(0.0),
 	_ref_alt(0.0)
 {
-#if defined(ENABLE_LOCKSTEP_SCHEDULER)
-	_lockstep_component = px4_lockstep_register_component();
-#else
 	_sensors_sub.set_interval_ms(10); // main prediction loop, 100 hz (lockstep requires to run at full rate)
-#endif
 
 	// assign distance subs to array
 	_dist_subs[0] = &_sub_dist0;
@@ -145,11 +140,6 @@ BlockLocalPositionEstimator::BlockLocalPositionEstimator() :
 		 (_param_lpe_fusion.get() & FUSE_BARO) != 0);
 }
 
-BlockLocalPositionEstimator::~BlockLocalPositionEstimator()
-{
-	px4_lockstep_unregister_component(_lockstep_component);
-}
-
 bool
 BlockLocalPositionEstimator::init()
 {
@@ -160,7 +150,6 @@ BlockLocalPositionEstimator::init()
 
 	return true;
 }
-
 
 Vector<float, BlockLocalPositionEstimator::n_x> BlockLocalPositionEstimator::dynamics(
 	float t,
@@ -176,6 +165,23 @@ void BlockLocalPositionEstimator::Run()
 		_sensors_sub.unregisterCallback();
 		exit_and_cleanup();
 		return;
+	}
+
+	if (_vehicle_command_sub.updated()) {
+		vehicle_command_s vehicle_command;
+
+		if (_vehicle_command_sub.update(&vehicle_command)) {
+			if (vehicle_command.command == vehicle_command_s::VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN) {
+				const double latitude = vehicle_command.param5;
+				const double longitude = vehicle_command.param6;
+				const float altitude = vehicle_command.param7;
+
+				map_projection_init_timestamped(&_global_local_proj_ref, latitude, longitude, vehicle_command.timestamp);
+				_global_local_alt0 = altitude;
+
+				PX4_INFO("New NED origin (LLA): %3.10f, %3.10f, %4.3f\n", latitude, longitude, static_cast<double>(altitude));
+			}
+		}
 	}
 
 	sensor_combined_s imu;
@@ -251,7 +257,7 @@ void BlockLocalPositionEstimator::Run()
 	_lastArmedState = armedState;
 
 	// see which updates are available
-	bool paramsUpdated = _sub_param_update.update();
+	const bool paramsUpdated = _parameter_update_sub.updated();
 	_baroUpdated = false;
 
 	if ((_param_lpe_fusion.get() & FUSE_BARO) && _sub_airdata.update()) {
@@ -276,6 +282,10 @@ void BlockLocalPositionEstimator::Run()
 
 	// update parameters
 	if (paramsUpdated) {
+		// clear update
+		parameter_update_s pupdate;
+		_parameter_update_sub.copy(&pupdate);
+
 		SuperBlock::updateParams();
 		ModuleParams::updateParams();
 		updateSSParams();
@@ -525,8 +535,6 @@ void BlockLocalPositionEstimator::Run()
 		_xDelay.update(_x);
 		_time_last_hist = _timeStamp;
 	}
-
-	px4_lockstep_progress(_lockstep_component);
 }
 
 void BlockLocalPositionEstimator::checkTimeouts()

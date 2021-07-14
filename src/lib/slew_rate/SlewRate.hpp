@@ -64,6 +64,12 @@ public:
 	void setForcedValue(const Type value) { _value = value; }
 
 	/**
+	 * Get value from last update of the slew rate
+	 * @return current value the slew rate is at
+	 */
+	Type getState() const { return _value; }
+
+	/**
 	 * Update slewrate
 	 * @param new_value desired new value
 	 * @param deltatime time in seconds since last update
@@ -79,7 +85,7 @@ public:
 		return _value;
 	}
 
-private:
+protected:
 	Type _slew_rate{}; ///< maximum rate of change for the value
 	Type _value{}; ///< state to keep last value of the slew rate
 };

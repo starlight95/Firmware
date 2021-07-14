@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2015-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -64,11 +64,13 @@
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/ekf2_timestamps.h>
 #include <uORB/topics/ekf_gps_drift.h>
+#include <uORB/topics/estimator_event_flags.h>
 #include <uORB/topics/estimator_innovations.h>
 #include <uORB/topics/estimator_optical_flow_vel.h>
 #include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/estimator_states.h>
 #include <uORB/topics/estimator_status.h>
+#include <uORB/topics/estimator_status_flags.h>
 #include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/parameter_update.h>
@@ -76,6 +78,7 @@
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_imu.h>
@@ -84,7 +87,7 @@
 #include <uORB/topics/vehicle_magnetometer.h>
 #include <uORB/topics/vehicle_odometry.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/wind_estimate.h>
+#include <uORB/topics/wind.h>
 #include <uORB/topics/yaw_estimator_status.h>
 
 #include "Utility/PreFlightChecker.hpp"
@@ -95,7 +98,7 @@ class EKF2 final : public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
 	EKF2() = delete;
-	EKF2(int instance, const px4::wq_config_t &config, int imu, int mag, bool replay_mode);
+	EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode);
 	~EKF2() override;
 
 	/** @see ModuleBase */
@@ -117,14 +120,16 @@ public:
 	static bool trylock_module() { return (pthread_mutex_trylock(&ekf2_module_mutex) == 0); }
 	static void unlock_module() { pthread_mutex_unlock(&ekf2_module_mutex); }
 
+	bool multi_init(int imu, int mag);
+
+	int instance() const { return _instance; }
+
 private:
 	void Run() override;
 
-	template<typename Param>
-	void update_mag_bias(Param &mag_bias_param, int axis_index);
-
 	void PublishAttitude(const hrt_abstime &timestamp);
 	void PublishEkfDriftMetrics(const hrt_abstime &timestamp);
+	void PublishEventFlags(const hrt_abstime &timestamp);
 	void PublishGlobalPosition(const hrt_abstime &timestamp);
 	void PublishInnovations(const hrt_abstime &timestamp, const imuSample &imu);
 	void PublishInnovationTestRatios(const hrt_abstime &timestamp);
@@ -136,6 +141,7 @@ private:
 	void PublishSensorBias(const hrt_abstime &timestamp);
 	void PublishStates(const hrt_abstime &timestamp);
 	void PublishStatus(const hrt_abstime &timestamp);
+	void PublishStatusFlags(const hrt_abstime &timestamp);
 	void PublishWindEstimate(const hrt_abstime &timestamp);
 	void PublishYawEstimatorStatus(const hrt_abstime &timestamp);
 
@@ -159,7 +165,7 @@ private:
 
 	const bool _replay_mode{false};			///< true when we use replay data from a log
 	const bool _multi_mode;
-	const int _instance;
+	int _instance{0};
 
 	px4::atomic_bool _task_should_exit{false};
 
@@ -170,17 +176,23 @@ private:
 
 	perf_counter_t _ecl_ekf_update_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": ECL update")};
 	perf_counter_t _ecl_ekf_update_full_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": ECL full update")};
-
-	// Initialise time stamps used to send sensor data to the EKF and for logging
-	uint8_t _invalid_mag_id_count = 0;	///< number of times an invalid magnetomer device ID has been detected
+	perf_counter_t _msg_missed_imu_perf{perf_alloc(PC_COUNT, MODULE_NAME": IMU message missed")};
+	perf_counter_t _msg_missed_air_data_perf{nullptr};
+	perf_counter_t _msg_missed_airspeed_perf{nullptr};
+	perf_counter_t _msg_missed_distance_sensor_perf{nullptr};
+	perf_counter_t _msg_missed_gps_perf{nullptr};
+	perf_counter_t _msg_missed_landing_target_pose_perf{nullptr};
+	perf_counter_t _msg_missed_magnetometer_perf{nullptr};
+	perf_counter_t _msg_missed_odometry_perf{nullptr};
+	perf_counter_t _msg_missed_optical_flow_perf{nullptr};
 
 	// Used to check, save and use learned magnetometer biases
-	hrt_abstime _last_magcal_us = 0;	///< last time the EKF was operating a mode that estimates magnetomer biases (uSec)
-	hrt_abstime _total_cal_time_us = 0;	///< accumulated calibration time since the last save
+	hrt_abstime _mag_cal_last_us{0};	///< last time the EKF was operating a mode that estimates magnetomer biases (uSec)
+	hrt_abstime _mag_cal_total_time_us{0};	///< accumulated calibration time since the last save
 
-	float _last_valid_mag_cal[3] = {};	///< last valid XYZ magnetometer bias estimates (Gauss)
-	float _last_valid_variance[3] = {};	///< variances for the last valid magnetometer XYZ bias estimates (Gauss**2)
-	bool _valid_cal_available{false};	///< true when an unsaved valid calibration for the XYZ magnetometer bias is available
+	Vector3f _mag_cal_last_bias{};	///< last valid XYZ magnetometer bias estimates (Gauss)
+	Vector3f _mag_cal_last_bias_variance{};	///< variances for the last valid magnetometer XYZ bias estimates (Gauss**2)
+	bool _mag_cal_available{false};	///< true when an unsaved valid calibration for the XYZ magnetometer bias is available
 
 	// Used to control saving of mag declination to be used on next startup
 	bool _mag_decl_saved = false;	///< true when the magnetic declination has been saved
@@ -192,18 +204,21 @@ private:
 	uint64_t _gps_alttitude_ellipsoid_previous_timestamp{0}; ///< storage for previous timestamp to compute dt
 	float   _wgs84_hgt_offset = 0;  ///< height offset between AMSL and WGS84
 
-	bool _imu_bias_reset_request{false};
+	uint8_t _imu_calibration_count{0};
+	uint8_t _mag_calibration_count{0};
 
 	uint32_t _device_id_accel{0};
 	uint32_t _device_id_baro{0};
 	uint32_t _device_id_gyro{0};
 	uint32_t _device_id_mag{0};
 
-	Vector3f _last_local_position_for_gpos{};
+	Vector3f _last_accel_bias_published{};
+	Vector3f _last_gyro_bias_published{};
+	Vector3f _last_mag_bias_published{};
 
-	Vector3f _last_accel_bias{};
-	Vector3f _last_gyro_bias{};
-	Vector3f _last_mag_bias{};
+	float _airspeed_scale_factor{1.0f}; ///< scale factor correction applied to airspeed measurements
+
+	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	uORB::Subscription _airdata_sub{ORB_ID(vehicle_air_data)};
 	uORB::Subscription _airspeed_sub{ORB_ID(airspeed)};
@@ -212,9 +227,9 @@ private:
 	uORB::Subscription _landing_target_pose_sub{ORB_ID(landing_target_pose)};
 	uORB::Subscription _magnetometer_sub{ORB_ID(vehicle_magnetometer)};
 	uORB::Subscription _optical_flow_sub{ORB_ID(optical_flow)};
-	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _sensor_selection_sub{ORB_ID(sensor_selection)};
 	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription _vehicle_command_sub{ORB_ID(vehicle_command)};
 	uORB::Subscription _vehicle_gps_position_sub{ORB_ID(vehicle_gps_position)};
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
 
@@ -222,11 +237,23 @@ private:
 	uORB::SubscriptionCallbackWorkItem _vehicle_imu_sub{this, ORB_ID(vehicle_imu)};
 
 	bool _callback_registered{false};
-	int _lockstep_component{-1};
 
 	bool _distance_sensor_selected{false}; // because we can have several distance sensor instances with different orientations
 	bool _armed{false};
 	bool _standby{false}; // standby arming state
+
+	hrt_abstime _last_status_flag_update{0};
+	hrt_abstime _last_range_sensor_update{0};
+
+	uint32_t _filter_control_status{0};
+	uint32_t _filter_fault_status{0};
+	uint32_t _innov_check_fail_status{0};
+
+	uint32_t _filter_control_status_changes{0};
+	uint32_t _filter_fault_status_changes{0};
+	uint32_t _innov_check_fail_status_changes{0};
+	uint32_t _filter_warning_event_changes{0};
+	uint32_t _filter_information_event_changes{0};
 
 	uORB::PublicationMulti<ekf2_timestamps_s>            _ekf2_timestamps_pub{ORB_ID(ekf2_timestamps)};
 	uORB::PublicationMulti<ekf_gps_drift_s>              _ekf_gps_drift_pub{ORB_ID(ekf_gps_drift)};
@@ -237,15 +264,18 @@ private:
 	uORB::PublicationMulti<estimator_sensor_bias_s>      _estimator_sensor_bias_pub{ORB_ID(estimator_sensor_bias)};
 	uORB::PublicationMulti<estimator_states_s>           _estimator_states_pub{ORB_ID(estimator_states)};
 	uORB::PublicationMulti<estimator_status_s>           _estimator_status_pub{ORB_ID(estimator_status)};
+	uORB::PublicationMulti<estimator_status_flags_s>     _estimator_status_flags_pub{ORB_ID(estimator_status_flags)};
+	uORB::PublicationMulti<estimator_event_flags_s>      _estimator_event_flags_pub{ORB_ID(estimator_event_flags)};
 	uORB::PublicationMulti<vehicle_odometry_s>           _estimator_visual_odometry_aligned_pub{ORB_ID(estimator_visual_odometry_aligned)};
 	uORB::PublicationMulti<yaw_estimator_status_s>       _yaw_est_pub{ORB_ID(yaw_estimator_status)};
-	uORB::PublicationMulti<wind_estimate_s>              _wind_pub{ORB_ID(wind_estimate)};
 
 	// publications with topic dependent on multi-mode
 	uORB::PublicationMulti<vehicle_attitude_s>           _attitude_pub;
 	uORB::PublicationMulti<vehicle_local_position_s>     _local_position_pub;
 	uORB::PublicationMulti<vehicle_global_position_s>    _global_position_pub;
 	uORB::PublicationMulti<vehicle_odometry_s>           _odometry_pub;
+	uORB::PublicationMulti<wind_s>              _wind_pub;
+
 
 	PreFlightChecker _preflt_checker;
 
@@ -375,6 +405,8 @@ private:
 		_param_ekf2_rng_a_hmax,	///< maximum allowed absolute altitude (AGL) for range aid (m)
 		(ParamExtFloat<px4::params::EKF2_RNG_A_IGATE>)
 		_param_ekf2_rng_a_igate,	///< gate size used for innovation consistency checks for range aid fusion (STD)
+		(ParamExtFloat<px4::params::EKF2_RNG_QLTY_T>)
+		_param_ekf2_rng_qlty_t, ///< Minimum duration during which the reported range finder signal quality needs to be non-zero in order to be declared valid (s)
 
 		// vision estimate fusion
 		(ParamInt<px4::params::EKF2_EV_NOISE_MD>)
@@ -443,17 +475,6 @@ private:
 		(ParamExtFloat<px4::params::EKF2_ANGERR_INIT>)
 		_param_ekf2_angerr_init,	///< 1-sigma tilt error after initial alignment using gravity vector (rad)
 
-		// EKF saved XYZ magnetometer bias values
-		(ParamFloat<px4::params::EKF2_MAGBIAS_X>) _param_ekf2_magbias_x,		///< X magnetometer bias (Gauss)
-		(ParamFloat<px4::params::EKF2_MAGBIAS_Y>) _param_ekf2_magbias_y,		///< Y magnetometer bias (Gauss)
-		(ParamFloat<px4::params::EKF2_MAGBIAS_Z>) _param_ekf2_magbias_z,		///< Z magnetometer bias (Gauss)
-		(ParamInt<px4::params::EKF2_MAGBIAS_ID>)
-		_param_ekf2_magbias_id,		///< ID of the magnetometer sensor used to learn the bias values
-		(ParamFloat<px4::params::EKF2_MAGB_VREF>)
-		_param_ekf2_magb_vref, ///< Assumed error variance of previously saved magnetometer bias estimates (Gauss**2)
-		(ParamFloat<px4::params::EKF2_MAGB_K>)
-		_param_ekf2_magb_k,	///< maximum fraction of the learned magnetometer bias that is saved at each disarm
-
 		// EKF accel bias learning control
 		(ParamExtFloat<px4::params::EKF2_ABL_LIM>) _param_ekf2_abl_lim,	///< Accelerometer bias learning limit (m/s**2)
 		(ParamExtFloat<px4::params::EKF2_ABL_ACCLIM>)
@@ -468,6 +489,7 @@ private:
 		_param_ekf2_drag_noise,	///< observation noise variance for drag specific force measurements (m/sec**2)**2
 		(ParamExtFloat<px4::params::EKF2_BCOEF_X>) _param_ekf2_bcoef_x,		///< ballistic coefficient along the X-axis (kg/m**2)
 		(ParamExtFloat<px4::params::EKF2_BCOEF_Y>) _param_ekf2_bcoef_y,		///< ballistic coefficient along the Y-axis (kg/m**2)
+		(ParamExtFloat<px4::params::EKF2_MCOEF>) _param_ekf2_mcoef,		///< propeller momentum drag coefficient (1/s)
 
 		// Corrections for static pressure position error where Ps_error = Ps_meas - Ps_truth
 		// Coef = Ps_error / Pdynamic, where Pdynamic = 1/2 * density * TAS**2
@@ -490,6 +512,8 @@ private:
 
 		(ParamFloat<px4::params::EKF2_REQ_GPS_H>) _param_ekf2_req_gps_h, ///< Required GPS health time
 		(ParamExtInt<px4::params::EKF2_MAG_CHECK>) _param_ekf2_mag_check, ///< Mag field strength check
+		(ParamExtInt<px4::params::EKF2_SYNT_MAG_Z>)
+		_param_ekf2_synthetic_mag_z, ///< Enables the use of a synthetic value for the Z axis of the magnetometer calculated from the 3D magnetic field vector at the location of the drone.
 
 		// Used by EKF-GSF experimental yaw estimator
 		(ParamExtFloat<px4::params::EKF2_GSF_TAS>)

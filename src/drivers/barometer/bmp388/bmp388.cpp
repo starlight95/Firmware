@@ -41,9 +41,8 @@
 
 #include "bmp388.h"
 
-BMP388::BMP388(I2CSPIBusOption bus_option, int bus, IBMP388 *interface) :
-	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id()), bus_option, bus,
-		     interface->get_device_address()),
+BMP388::BMP388(const I2CSPIDriverConfig &config, IBMP388 *interface) :
+	I2CSPIDriver(config),
 	_px4_baro(interface->get_device_id()),
 	_interface(interface),
 	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
@@ -66,7 +65,7 @@ int
 BMP388::init()
 {
 	if (!soft_reset()) {
-		PX4_WARN("failed to reset baro during init");
+		PX4_DEBUG("failed to reset baro during init");
 		return -EIO;
 	}
 
@@ -112,7 +111,8 @@ BMP388::start()
 {
 	_collect_phase = false;
 
-	ScheduleOnInterval(_measure_interval, _measure_interval);
+	// wait a bit longer for the first measurement, as otherwise the first readout might fail
+	ScheduleOnInterval(_measure_interval, _measure_interval * 3);
 }
 
 void

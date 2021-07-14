@@ -39,7 +39,6 @@
 #pragma once
 
 #include <math.h>
-#include <drivers/drv_baro.h>
 #include <drivers/drv_hrt.h>
 #include <lib/cdev/CDev.hpp>
 #include <perf/perf_counter.h>
@@ -309,11 +308,10 @@ public:
 class BMP388 : public I2CSPIDriver<BMP388>
 {
 public:
-	BMP388(I2CSPIBusOption bus_option, int bus, IBMP388 *interface);
+	BMP388(const I2CSPIDriverConfig &config, IBMP388 *interface);
 	virtual ~BMP388();
 
-	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
-					     int runtime_instance);
+	static I2CSPIDriverBase *instantiate(const I2CSPIDriverConfig &config, int runtime_instance);
 	static void print_usage();
 
 	virtual int		init();

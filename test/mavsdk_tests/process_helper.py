@@ -176,15 +176,25 @@ class Px4Runner(Runner):
     def clear_rootfs(self) -> None:
         rootfs_path = self.cwd
         if self.verbose:
-            print("Deleting rootfs: {}".format(rootfs_path))
+            print("Clearing rootfs (except logs): {}".format(rootfs_path))
         if os.path.isdir(rootfs_path):
-            shutil.rmtree(rootfs_path)
+            for item in os.listdir(rootfs_path):
+                if item == 'log':
+                    continue
+                path = os.path.join(rootfs_path, item)
+                if os.path.isfile(path) or os.path.islink(path):
+                    os.remove(path)
+                else:
+                    shutil.rmtree(path)
 
     def create_rootfs(self) -> None:
         rootfs_path = self.cwd
         if self.verbose:
             print("Creating rootfs: {}".format(rootfs_path))
-        os.makedirs(rootfs_path)
+        try:
+            os.makedirs(rootfs_path)
+        except FileExistsError:
+            pass
 
 
 class GzserverRunner(Runner):
@@ -203,8 +213,9 @@ class GzserverRunner(Runner):
         self.env["GAZEBO_MODEL_PATH"] = \
             workspace_dir + "/Tools/sitl_gazebo/models"
         self.env["PX4_SIM_SPEED_FACTOR"] = str(speed_factor)
-        self.cmd = "gzserver"
-        self.args = ["--verbose",
+        self.cmd = "nice"
+        self.args = ["-n 1",
+                     "gzserver", "--verbose",
                      workspace_dir + "/Tools/sitl_gazebo/worlds/" +
                      "empty.world"]
 
@@ -268,10 +279,13 @@ class TestRunner(Runner):
                  model: str,
                  case: str,
                  mavlink_connection: str,
+                 speed_factor: float,
                  verbose: bool):
         super().__init__(log_dir, model, case, verbose)
         self.name = "mavsdk_tests"
         self.cwd = workspace_dir
         self.cmd = workspace_dir + \
             "/build/px4_sitl_default/mavsdk_tests/mavsdk_tests"
-        self.args = ["--url", mavlink_connection, case]
+        self.args = ["--url", mavlink_connection,
+                     "--speed-factor", str(speed_factor),
+                     case]

@@ -104,10 +104,9 @@ PARAM_DEFINE_INT32(CAL_GYRO1_PRIO, -1);
  * @value 38 Roll 90°, Pitch 68°, Yaw 293°
  * @value 39 Pitch 315°
  * @value 40 Roll 90°, Pitch 315°
- * @value 41 Roll 270°, Yaw 180°
  *
  * @min -1
- * @max 41
+ * @max 40
  * @reboot_required true
  * @category system
  * @group Sensor Calibration
@@ -119,6 +118,7 @@ PARAM_DEFINE_INT32(CAL_GYRO1_ROT, -1);
  *
  * @category system
  * @group Sensor Calibration
+ * @volatile
  */
 PARAM_DEFINE_FLOAT(CAL_GYRO1_XOFF, 0.0f);
 
@@ -127,6 +127,7 @@ PARAM_DEFINE_FLOAT(CAL_GYRO1_XOFF, 0.0f);
  *
  * @category system
  * @group Sensor Calibration
+ * @volatile
  */
 PARAM_DEFINE_FLOAT(CAL_GYRO1_YOFF, 0.0f);
 
@@ -135,5 +136,6 @@ PARAM_DEFINE_FLOAT(CAL_GYRO1_YOFF, 0.0f);
  *
  * @category system
  * @group Sensor Calibration
+ * @volatile
  */
 PARAM_DEFINE_FLOAT(CAL_GYRO1_ZOFF, 0.0f);

@@ -7,6 +7,8 @@ get_property(module_libraries GLOBAL PROPERTY PX4_MODULE_LIBRARIES)
 # CMAKE_CURRENT_BINARY_DIR ''./platforms/posix' to './bin'
 if (NOT CATKIN_DEVEL_PREFIX)
 	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
 endif()
 
 set(PX4_SHELL_COMMAND_PREFIX "px4-")
@@ -68,7 +70,7 @@ else()
 		target_link_libraries(px4 PRIVATE rt)
 	endif()
 
-	target_link_libraries(px4 PRIVATE modules__uORB)
+	target_link_libraries(px4 PRIVATE uORB)
 
 	#=============================================================================
 	# install

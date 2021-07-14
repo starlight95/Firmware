@@ -131,6 +131,7 @@ ENTRY(_stext)
  */
 EXTERN(abort)
 EXTERN(_bootdelay_signature)
+EXTERN(board_get_manifest)
 
 SECTIONS
 {
@@ -167,14 +168,6 @@ SECTIONS
 		_einit = ABSOLUTE(.);
 	} > flash
 
-	/*
-	 * Construction data for parameters.
-	 */
-	__param ALIGN(4): {
-		__param_start = ABSOLUTE(.);
-		KEEP(*(__param*))
-		__param_end = ABSOLUTE(.);
-	} > flash
 
 	.ARM.extab : {
 		*(.ARM.extab*)
@@ -207,8 +200,11 @@ SECTIONS
 
 	/* Emit the the D3 power domain section for locating BDMA data */
 
-	.sram4 (NOLOAD) :
+	.sram4_reserve (NOLOAD) :
 	{
+		*(.sram4)
+		. = ALIGN(4);
+		_sram4_heap_start = ABSOLUTE(.);
 	} > sram4
 
 	/* Stabs debugging sections. */

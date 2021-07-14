@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2014-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2014-2019, 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,7 @@
 
 #include "lightware_laser_serial.hpp"
 
+#include <inttypes.h>
 #include <fcntl.h>
 #include <termios.h>
 
@@ -41,7 +42,7 @@
 
 LightwareLaserSerial::LightwareLaserSerial(const char *port, uint8_t rotation) :
 	ScheduledWorkItem(MODULE_NAME, px4::serial_port_to_wq(port)),
-	_px4_rangefinder(0 /* device id not yet used */, rotation),
+	_px4_rangefinder(0, rotation),
 	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
 	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": com_err"))
 {
@@ -50,6 +51,18 @@ LightwareLaserSerial::LightwareLaserSerial(const char *port, uint8_t rotation) :
 
 	/* enforce null termination */
 	_port[sizeof(_port) - 1] = '\0';
+
+	device::Device::DeviceId device_id;
+	device_id.devid_s.bus_type = device::Device::DeviceBusType_SERIAL;
+
+	uint8_t bus_num = atoi(&_port[strlen(_port) - 1]); // Assuming '/dev/ttySx'
+
+	if (bus_num < 10) {
+		device_id.devid_s.bus = bus_num;
+	}
+
+	_px4_rangefinder.set_device_id(device_id.devid);
+	_px4_rangefinder.set_device_type(DRV_DIST_DEVTYPE_LIGHTWARE_LASER);
 }
 
 LightwareLaserSerial::~LightwareLaserSerial()
@@ -98,8 +111,24 @@ LightwareLaserSerial::init()
 		_interval = 50000;
 		break;
 
+	case 6:
+		/* SF30/B (50m 39Hz) */
+		_px4_rangefinder.set_min_distance(0.2f);
+		_px4_rangefinder.set_max_distance(50.0f);
+		_interval = 1e6 / 39;
+		_simple_serial = true;
+		break;
+
+	case 7:
+		/* SF30/C (100m 39Hz) */
+		_px4_rangefinder.set_min_distance(0.2f);
+		_px4_rangefinder.set_max_distance(100.0f);
+		_interval = 1e6 / 39;
+		_simple_serial = true;
+		break;
+
 	default:
-		PX4_ERR("invalid HW model %d.", hw_model);
+		PX4_ERR("invalid HW model %" PRIi32 ".", hw_model);
 		return -1;
 	}
 
@@ -160,11 +189,35 @@ int LightwareLaserSerial::collect()
 	float distance_m = -1.0f;
 	bool valid = false;
 
-	for (int i = 0; i < ret; i++) {
-		if (OK == lightware_parser(readbuf[i], _linebuf, &_linebuf_index, &_parse_state, &distance_m)) {
-			valid = true;
+	if (_simple_serial) {
+		// Simplified protocol used by the SF30/B and SF30/C
+		// First byte: MSB of byte is set;  remaining bits are high "byte" of reading
+		// Second byte: MSB of byte is not set; remaining bits are low "byte" of reading
+		// Distance in centimeters = (buf[0] & 0x7F)*128 + buf[0]
+		bool have_msb = false;
+
+		for (int i = 0; i < ret; i++) {
+			if (have_msb && !(readbuf[i] & 0x80)) {
+				distance_m += readbuf[i] * .01f;
+				valid = true;
+				break;
+
+			} else {
+				if (readbuf[i] & 0x80) {
+					have_msb = true;
+					distance_m = (readbuf[i] & 0x7F) * 1.28f;
+				}
+			}
+		}
+
+	} else {
+		for (int i = 0; i < ret; i++) {
+			if (OK == lightware_parser(readbuf[i], _linebuf, &_linebuf_index, &_parse_state, &distance_m)) {
+				valid = true;
+			}
 		}
 	}
+
 
 	if (!valid) {
 		return -EAGAIN;
@@ -225,7 +278,7 @@ void LightwareLaserSerial::Run()
 
 		unsigned speed;
 
-		if (hw_model == 5) {
+		if (hw_model >= 5) {
 			speed = B115200;
 
 		} else {
